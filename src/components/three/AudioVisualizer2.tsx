@@ -180,12 +180,12 @@ const BASS_CONFIG = {
   bassIntensity: 0.7,
   midIntensity: 0.6,
   highIntensity: 0.6,
-  radiusMultiplier: 4, // Changed from 16 to 12 to match original
-  radiusPower: 22, // Changed from 10 to 22 to match original
-  particleScaleMax: 1.2,
-  roundnessMultiplier: 2,
+  radiusMultiplier: 16, // Back to 16
+  radiusPower: 10, // Back to 10 - 22 was too extreme
+  particleScaleMax: 2,
+  roundnessMultiplier: 8,
   lightIntensityMultiplier: 6,
-  rotationSpeedMax: 16,
+  rotationSpeedMax: 4,
   enableColorShift: true,
 };
 
@@ -265,6 +265,7 @@ const AudioVisualizer: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayButton, setShowPlayButton] = useState(true);
   const [debugInfo, setDebugInfo] = useState("Loading...");
+  const isPlayingRef = useRef(false);
 
   const pathLength = 256;
   const particleCount = 77777;
@@ -344,7 +345,7 @@ const AudioVisualizer: React.FC = () => {
       pathPositions[i * 3] = x;
       pathPositions[i * 3 + 1] = y;
       pathPositions[i * 3 + 2] = z;
-      radiusArray[i] = 0;
+      radiusArray[i] = 0; // Changed from 0 to match original initialization
     }
 
     // Create prefab geometry (sphere)
@@ -377,7 +378,7 @@ const AudioVisualizer: React.FC = () => {
       const duration =
         minDuration + Math.random() * (maxDuration - minDuration);
 
-      // Random pivot
+      // Random pivot (matching original range 0-2)
       const pivot = new THREE.Vector3(
         Math.random() * 2,
         Math.random() * 2,
@@ -621,6 +622,7 @@ const AudioVisualizer: React.FC = () => {
       pathPositions,
       radiusArray,
       lights: { light1, light2, light3 },
+      analyzer: undefined, // Initialize as undefined
     };
 
     setDebugInfo("Ready to play");
@@ -649,10 +651,19 @@ const AudioVisualizer: React.FC = () => {
       // Audio processing
       if (
         sceneRef.current.analyzer &&
-        isPlaying &&
+        isPlayingRef.current &&
         audioRef.current &&
         !audioRef.current.paused
       ) {
+        if (frameCount % 60 === 0) {
+          console.log("Processing audio...", {
+            isPlaying: isPlayingRef.current,
+            paused: audioRef.current.paused,
+            currentTime: audioRef.current.currentTime,
+            analyzer: sceneRef.current.analyzer,
+          });
+        }
+
         sceneRef.current.analyzer.updateSample();
         const data = sceneRef.current.analyzer.frequencyByteData;
         const dataArray: number[] = [];
@@ -935,8 +946,16 @@ const AudioVisualizer: React.FC = () => {
         }
       } else {
         // Default animation when not playing
+        if (frameCount % 60 === 0) {
+          console.log("Not processing audio:", {
+            hasAnalyzer: !!sceneRef.current.analyzer,
+            isPlaying: isPlayingRef.current,
+            hasAudioRef: !!audioRef.current,
+            isPaused: audioRef.current?.paused,
+          });
+        }
         for (let i = 0; i < pathLength; i++) {
-          radiusArray[i] = 128;
+          radiusArray[i] = 0; // Changed from 128 to 0 to match original
         }
       }
 
@@ -973,26 +992,46 @@ const AudioVisualizer: React.FC = () => {
   }, []);
 
   const handlePlay = async () => {
-    if (!audioRef.current || !sceneRef.current) return;
+    console.log("handlePlay called");
+    if (!audioRef.current || !sceneRef.current) {
+      console.log("Missing refs:", {
+        audio: !!audioRef.current,
+        scene: !!sceneRef.current,
+      });
+      return;
+    }
 
     setDebugInfo("Initializing audio...");
 
     try {
       if (!sceneRef.current.analyzer) {
+        console.log("Creating analyzer...");
         sceneRef.current.analyzer = new AudioAnalyzer(pathLength * 4, 0.85);
       }
 
+      console.log("Initializing analyzer...");
       const success = await sceneRef.current.analyzer.init(audioRef.current);
       if (!success) {
         setDebugInfo("Failed to initialize audio");
         return;
       }
 
+      // Ensure audio context is resumed
+      if (sceneRef.current.analyzer.context.state === "suspended") {
+        await sceneRef.current.analyzer.context.resume();
+        console.log("Audio context resumed");
+      }
+
       audioRef.current.currentTime = 0;
+      console.log("About to play audio...");
       await audioRef.current.play();
+      console.log("Audio play() called successfully");
+
       setIsPlaying(true);
+      isPlayingRef.current = true;
       setShowPlayButton(false);
       setDebugInfo("Playing...");
+      console.log("State updated: isPlaying = true, analyzer connected");
 
       if (sceneRef.current) {
         // Set camera far away initially like original
@@ -1006,6 +1045,26 @@ const AudioVisualizer: React.FC = () => {
     }
   };
 
+  // https://audio.jukehost.co.uk/zUdVklGhHiAU2oiE5SVBc4vMBGDGzbw8 purification
+  // https://audio.jukehost.co.uk/G9IP9mTb3TX7A7s62Ewyzz7zj8kZy7JN deathwish
+  // https://audio.jukehost.co.uk/8av8bkxKOR4X3R91t0mb1UqInZD8wmH3 moxy
+  //  https://audio.jukehost.co.uk/iJjfNQxERiC3AWRickC1D4h22i1gn2lR shades mini mix
+  // https://audio.jukehost.co.uk/wfpwn6xbuwRmsmmFnN8Kj1d2l798DZGm dangerous sound
+  // https://audio.jukehost.co.uk/0EJLc7kHziCZqw2vrXjDMydp4bV8ZpSs MOition
+  // https://audio.jukehost.co.uk/hPaFGSg7UGLAI4L5kIqe6oAJBDghjOy7 scars
+  // https://audio.jukehost.co.uk/2NEtHGbSeJsxSLRDSh7DNFNOkoJzoYhu everglade
+  // https://audio.jukehost.co.uk/8NOVJYBnXfaxsoG8QO7uFzYhTUsNEHSb resurrected
+  // https://audio.jukehost.co.uk/87FCkBPZTX6Q035uIDBrHtZAYW02HFv7 secret technique
+  // https://audio.jukehost.co.uk/Y0Cka9EKsZCkwae4BBfu7fFyrMsGRygr our hero returns
+  // https://audio.jukehost.co.uk/N6zOcNgdXDRovyWiUamhkYezM1gIgbLG fried
+  // https://audio.jukehost.co.uk/eHljWEJq9WBfzqOXbJmKUfuEWgNxXgLM cake remix
+  // https://audio.jukehost.co.uk/1NDvASI3cdiNnBZbDfMjLnaMR70kF47O 10 pound
+  // https://audio.jukehost.co.uk/I0ruFoSQgq7T4pnUTHAwTShJh6Yp6OKN tentacles
+  // https://audio.jukehost.co.uk/TDrkUvipGApgKgYZ7ovXBv42i4EHUAMD the corruption
+  // https://audio.jukehost.co.uk/Yszr2ZqGhoNJNAGTEPFQGB5AtMXCSwjw immortals
+  // https://audio.jukehost.co.uk/4muD75tIMG9HEUpUMttlRlJXCzAmWMwf the last judgement
+  // https://audio.jukehost.co.uk/oyBXOCQB1qnYjGJq9pJqiI1e0QV3Xego stephanie
+
   return (
     <div className="relative h-screen w-full overflow-hidden bg-black">
       <div ref={containerRef} className="h-full w-full" />
@@ -1016,6 +1075,7 @@ const AudioVisualizer: React.FC = () => {
         src="https://audio.jukehost.co.uk/TDrkUvipGApgKgYZ7ovXBv42i4EHUAMD"
         onEnded={() => {
           setIsPlaying(false);
+          isPlayingRef.current = false;
           setShowPlayButton(true);
           setDebugInfo("Ready to play");
         }}
