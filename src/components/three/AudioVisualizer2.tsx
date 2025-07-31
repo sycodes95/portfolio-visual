@@ -6,7 +6,7 @@ class CameraController {
   camera: THREE.PerspectiveCamera;
   domElement: HTMLElement;
   autoRotate = true;
-  autoRotateSpeed = 2.0;
+  autoRotateSpeed = 0.05;
   rotationY = 0;
   targetDistance = 1200;
   distance = 1200;
@@ -185,7 +185,7 @@ const BASS_CONFIG = {
   particleScaleMax: 2,
   roundnessMultiplier: 8,
   lightIntensityMultiplier: 6,
-  rotationSpeedMax: 4,
+  rotationSpeedMax: 5,
   enableColorShift: true,
 };
 
@@ -1065,6 +1065,8 @@ const AudioVisualizer: React.FC = () => {
   // https://audio.jukehost.co.uk/4muD75tIMG9HEUpUMttlRlJXCzAmWMwf the last judgement
   // https://audio.jukehost.co.uk/oyBXOCQB1qnYjGJq9pJqiI1e0QV3Xego stephanie
 
+  const aud = "https://audio.jukehost.co.uk/oyBXOCQB1qnYjGJq9pJqiI1e0QV3Xego";
+
   return (
     <div className="relative h-screen w-full overflow-hidden bg-black">
       <div ref={containerRef} className="h-full w-full" />
@@ -1072,7 +1074,7 @@ const AudioVisualizer: React.FC = () => {
       <audio
         ref={audioRef}
         crossOrigin="anonymous"
-        src="https://audio.jukehost.co.uk/TDrkUvipGApgKgYZ7ovXBv42i4EHUAMD"
+        src={aud}
         onEnded={() => {
           setIsPlaying(false);
           isPlayingRef.current = false;
