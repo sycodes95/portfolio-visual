@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { hush_borne, immortal_eprom, stephanie_danielallen, weightless_wink } from "../../assets/mp3s";
-const aud =  weightless_wink;
+const aud =  hush_borne;
 // Particle color configuration
 const PARTICLE_COLOR = {
   r: 1.0, // Red
@@ -21,23 +21,23 @@ const PARTICLE_COLOR = {
 
 // Bass configuration
 const BASS_CONFIG = {
-  subBassIntensity: 0.3,
-  lowBassIntensity: 0.6,
+  subBassIntensity: 0.4,
+  lowBassIntensity: 0.5,
   lowMidIntensity: 0.9,
-  highMidIntensity: 0.7,
+  highMidIntensity: 0.8,
   highIntensity: 0.8,
   radiusMultiplier: 12,
-  radiusPower: 7,
+  radiusPower: 8,
   particleScaleMax: 2,
-  roundnessMultiplier: 8,
+  roundnessMultiplier: 10,
   lightIntensityMultiplier: 6,
-  rotationSpeedMax: 20,
+  rotationSpeedMax: 25,
   enableColorShift: true,
   subBassShakeIntensity: 6,
-  subBassRotationIntensity: 40,
-  subBassThreshold: 0.7,
-	subBassDecay: 1,
-	subBassAttack: 2
+  subBassRotationIntensity: 100,
+  subBassThreshold: 0.4,
+	subBassDecay: 0.1,
+	subBassAttack: 1
 };
 
 // Camera Controller
@@ -736,7 +736,7 @@ const AudioVisualizer: React.FC = () => {
         const binHz = sampleRate / (sceneRef.current.analyzer.binCount * 2);
         const subBassEnd = Math.floor(80 / binHz); // 20-100 Hz
         const lowBassEnd = Math.floor(250 / binHz); // 100-250 Hz
-        const lowMidEnd = Math.floor(1700 / binHz); // 250-1500 Hz
+        const lowMidEnd = Math.floor(1200 / binHz); // 250-1500 Hz
         const highMidEnd = Math.floor(3000 / binHz); // 1500-3000 Hz
 
         // Calculate averages for each band
@@ -841,6 +841,8 @@ const AudioVisualizer: React.FC = () => {
           (now - subBassPeakTime > 50)
         ) {
           isBassHit = true;
+
+					console.log("BASS HIT")
           animState.current.subBassPeak = subBassAvg * BASS_CONFIG.subBassAttack;
           animState.current.subBassPeakTime = now;
           anim.bassHitTime = now;
