@@ -6,3 +6,6 @@ export { default as camelblues_mndsgn } from "./Mndsgn - Camelblues - OMO - Soun
 export { default as unfaith_ekali } from "./Unfaith - Ekali - SoundLoadMate.com.mp3";
 export { default as weightless_wink } from "./weightless - WINK - SoundLoadMate.com.mp3";
 export { default as holdmedown_borne } from "./hold me down - borne.mp3";
+
+export const immortal_eprom =
+  "https://audio.jukehost.co.uk/Yszr2ZqGhoNJNAGTEPFQGB5AtMXCSwjw";

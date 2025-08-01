@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { weightless_wink } from "../../assets/mp3s";
 
 // Particle color configuration - Easy to change!
 const PARTICLE_COLOR = {
@@ -1192,7 +1191,7 @@ const AudioVisualizer: React.FC = () => {
       <audio
         ref={audioRef}
         crossOrigin="anonymous"
-        src={weightless_wink}
+        src={"https://audio.jukehost.co.uk/Yszr2ZqGhoNJNAGTEPFQGB5AtMXCSwjw"}
         onEnded={() => {
           setIsPlaying(false);
           isPlayingRef.current = false;
