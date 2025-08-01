@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { immortal_eprom } from "../../assets/mp3s";
+import { hush_borne } from "../../assets/mp3s";
 
 // Particle color configuration - Easy to change!
 const PARTICLE_COLOR = {
@@ -23,6 +23,8 @@ const PARTICLE_COLOR = {
     color3: { r: 1, g: 1, b: 1 },
   },
 };
+
+const aud = hush_borne;
 
 // Camera Controller
 class CameraController {
@@ -250,23 +252,29 @@ class AudioAnalyzer {
 const BASS_CONFIG = {
   // 5 frequency sections
   subBassIntensity: 0.5, // 20-60 Hz
-  lowBassIntensity: 0.5, // 60-250 Hz
-  lowMidIntensity: 0.9, // 250-500 Hz
+  lowBassIntensity: 0.6, // 60-250 Hz
+  lowMidIntensity: 0.8, // 250-500 Hz
   highMidIntensity: 0.9, // 500-2000 Hz
-  highIntensity: 0.9, // 2000+ Hz
+  highIntensity: 0.7, // 2000+ Hz
 
-  radiusMultiplier: 6,
-  radiusPower: 20,
-  particleScaleMax: 1.5,
-  roundnessMultiplier: 6,
+  radiusMultiplier: 15,
+  radiusPower: 8,
+  particleScaleMax: 2,
+  roundnessMultiplier: 4,
   lightIntensityMultiplier: 6,
-  rotationSpeedMax: 2,
+  rotationSpeedMax: 3,
   enableColorShift: true,
 
   // Shake parameters for sub-bass
-  subBassShakeIntensity: 3, // Erratic shake multiplier
+  subBassShakeIntensity: 8, // Erratic shake multiplier
   // Rotation for sub-bass
-  subBassRotationIntensity: 0.2, // Spine rotation intensity
+  subBassRotationIntensity: 1, // Spine rotation intensity
+  subBassSpinePercent: 0.1, // 10% of spine
+  lowBassSpinePercent: 0.3, // 30% of spine
+  individualShakeIntensity: 25, // Individual particle shake
+  kickDecayThreshold: 0.85, // 85% volume threshold
+  kickDecayTime: 200, // 200ms decay
+  kickDecayAmount: 0.5, // Drop to 50% effect
 };
 
 // Helper functions
@@ -332,6 +340,12 @@ const AudioVisualizer: React.FC = () => {
     bassHitTime: 0,
     shakePhase: 0,
     rotationPhase: 0, // For spine rotation
+    smoothedSubBassAvg: 0,
+    smoothedLowBassAvg: 0,
+    previousSubBassAvg: 0,
+    previousLowBassAvg: 0,
+    lastKickTime: 0,
+    kickDecayActive: false,
   });
 
   useEffect(() => {
@@ -351,7 +365,7 @@ const AudioVisualizer: React.FC = () => {
       0.1,
       10000,
     );
-    camera.position.set(0, 0, 1200);
+    camera.position.set(0, 0, 5000);
 
     // Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -393,9 +407,11 @@ const AudioVisualizer: React.FC = () => {
     // Create path
     const pathPositions = new Float32Array(pathLength * 3);
     const radiusArray = new Float32Array(pathLength);
-    const shakeArray = new Float32Array(pathLength * 3);
-    const rotationArray = new Float32Array(pathLength); // Rotation for each point
-    const panArray = new Float32Array(pathLength); // Stereo pan factor (-1 to 1)
+    const shakeArray = new Float32Array(pathLength * 3); // Spine shake
+    const rotationArray = new Float32Array(pathLength);
+    const panArray = new Float32Array(pathLength);
+    const individualShakeArray = new Float32Array(pathLength * 3); // NEW: Individual particle shake
+    const kickDecayArray = new Float32Array(pathLength);
 
     for (let i = 0; i < pathLength; i++) {
       let x, y, z;
@@ -423,6 +439,10 @@ const AudioVisualizer: React.FC = () => {
       shakeArray[i * 3 + 2] = 0;
       rotationArray[i] = 0;
       panArray[i] = 0;
+      individualShakeArray[i * 3] = 0;
+      individualShakeArray[i * 3 + 1] = 0;
+      individualShakeArray[i * 3 + 2] = 0;
+      kickDecayArray[i] = 1.0;
     }
 
     // Create prefab geometry (sphere)
@@ -538,6 +558,9 @@ const AudioVisualizer: React.FC = () => {
       uniform float uPan[PATH_LENGTH];
       uniform vec2 uRoundness;
       uniform float uParticleScale;
+      uniform float uSubBassAvg;
+      uniform vec3 uIndividualShake[PATH_LENGTH]; // NEW
+      uniform float uKickDecay[PATH_LENGTH];      // NEW
       
       attribute vec2 aDelayDuration;
       attribute vec3 aPivot;
@@ -647,6 +670,25 @@ const AudioVisualizer: React.FC = () => {
         transformed = rotateVector(tQuat, transformed);
         transformed *= uParticleScale;
         
+        // Individual particle shake for sub-bass (erratic, random per particle)
+        float subBassFactor = 1.0 - smoothstep(0.0, 0.1, tProgress); // Assuming sub-bass is first 10% of progress
+        float individualShakeAmp = uSubBassAvg * subBassFactor * 8.0; // Adjust amplitude here
+        vec3 individualShake = vec3(
+          sin(uTime * 10.0 + aPivot.x * 31.4 + aPivot.y * 17.2),
+          sin(uTime * 11.0 + aPivot.y * 29.3 + aPivot.z * 13.7),
+          sin(uTime * 12.0 + aPivot.z * 23.6 + aPivot.x * 19.8)
+        ) * individualShakeAmp;
+        transformed += individualShake;
+
+        // NEW: Apply individual particle shake based on pivot
+        float individualShakeAmount = uIndividualShake[pathIndex].x * aPivot.x + 
+                                      uIndividualShake[pathIndex].y * aPivot.y + 
+                                      uIndividualShake[pathIndex].z * aPivot.z;
+        transformed += individualShakeAmount * 2.0;
+        
+        // NEW: Apply kick decay
+        transformed *= uKickDecay[pathIndex];
+        
         // Add base position and shake
         vec3 basePosition = catmullRom(p0, p1, p2, p3, uRoundness, tWeight);
         transformed += basePosition + shake;
@@ -715,6 +757,7 @@ const AudioVisualizer: React.FC = () => {
         uPan: { value: panArray },
         uRoundness: { value: new THREE.Vector2(2, 2) },
         uParticleScale: { value: 1.0 },
+        uSubBassAvg: { value: 0.0 },
         uEmissive: {
           value: new THREE.Color(
             PARTICLE_COLOR.emissive.r,
@@ -862,11 +905,29 @@ const AudioVisualizer: React.FC = () => {
           subBassLeft += dataLeft[i];
           subBassRight += dataRight[i];
         }
-        let subBassAvg =
+        let rawSubBassAvg =
           (subBassTotal / Math.max(1, subBassEnd) / 255) *
           BASS_CONFIG.subBassIntensity;
         let subBassLeftAvg = subBassLeft / Math.max(1, subBassEnd) / 255;
         let subBassRightAvg = subBassRight / Math.max(1, subBassEnd) / 255;
+
+        // Envelope for sub-bass: fast attack, conditional decay, transient boost
+        let subBassDelta = rawSubBassAvg - anim.previousSubBassAvg;
+        if (subBassDelta > 0.05) {
+          // Onset detection for transient boost
+          anim.smoothedSubBassAvg += subBassDelta * 2.0;
+          anim.smoothedSubBassAvg = Math.min(1.5, anim.smoothedSubBassAvg);
+        }
+        if (rawSubBassAvg > anim.smoothedSubBassAvg) {
+          anim.smoothedSubBassAvg = rawSubBassAvg; // Fast attack
+        } else {
+          let decayRate = anim.smoothedSubBassAvg > 0.8 ? 0.1 : 0.5; // Slow decay if high, fast if low
+          anim.smoothedSubBassAvg =
+            anim.smoothedSubBassAvg * (1 - decayRate) +
+            rawSubBassAvg * decayRate;
+        }
+        let subBassAvg = anim.smoothedSubBassAvg;
+        anim.previousSubBassAvg = rawSubBassAvg;
 
         // Low bass with stereo
         for (let i = subBassEnd; i < lowBassEnd; i++) {
@@ -874,13 +935,30 @@ const AudioVisualizer: React.FC = () => {
           lowBassLeft += dataLeft[i];
           lowBassRight += dataRight[i];
         }
-        let lowBassAvg =
+        let rawLowBassAvg =
           (lowBassTotal / Math.max(1, lowBassEnd - subBassEnd) / 255) *
           BASS_CONFIG.lowBassIntensity;
         let lowBassLeftAvg =
           lowBassLeft / Math.max(1, lowBassEnd - subBassEnd) / 255;
         let lowBassRightAvg =
           lowBassRight / Math.max(1, lowBassEnd - subBassEnd) / 255;
+
+        // Envelope for low-bass: similar to sub-bass for better reaction
+        let lowBassDelta = rawLowBassAvg - anim.previousLowBassAvg;
+        if (lowBassDelta > 0.05) {
+          anim.smoothedLowBassAvg += lowBassDelta * 1.5;
+          anim.smoothedLowBassAvg = Math.min(1.5, anim.smoothedLowBassAvg);
+        }
+        if (rawLowBassAvg > anim.smoothedLowBassAvg) {
+          anim.smoothedLowBassAvg = rawLowBassAvg;
+        } else {
+          let decayRate = anim.smoothedLowBassAvg > 0.8 ? 0.1 : 0.5;
+          anim.smoothedLowBassAvg =
+            anim.smoothedLowBassAvg * (1 - decayRate) +
+            rawLowBassAvg * decayRate;
+        }
+        let lowBassAvg = anim.smoothedLowBassAvg;
+        anim.previousLowBassAvg = rawLowBassAvg;
 
         // Low mids with stereo
         for (let i = lowBassEnd; i < lowMidEnd; i++) {
@@ -1000,13 +1078,19 @@ const AudioVisualizer: React.FC = () => {
         }
 
         const visibleRange = maxVisibleProgress - minVisibleProgress;
-        const sectionSize = visibleRange / 5; // Divide into 5 equal sections
 
-        // Calculate thresholds for 5 sections
-        const subBassThreshold = minVisibleProgress + sectionSize;
-        const lowBassThreshold = minVisibleProgress + sectionSize * 2;
-        const lowMidThreshold = minVisibleProgress + sectionSize * 3;
-        const highMidThreshold = minVisibleProgress + sectionSize * 4;
+        // Adjusted section portions: sub-bass 10%, regular bass 30%, remaining 60% split evenly (20% each)
+        const subBassPortion = 0.1;
+        const lowBassPortion = 0.3;
+        const otherPortion = 0.2; // For lowMid, highMid, high
+
+        // Calculate thresholds for 5 sections with adjusted sizes
+        const subBassThreshold =
+          minVisibleProgress + visibleRange * subBassPortion;
+        const lowBassThreshold =
+          subBassThreshold + visibleRange * lowBassPortion;
+        const lowMidThreshold = lowBassThreshold + visibleRange * otherPortion;
+        const highMidThreshold = lowMidThreshold + visibleRange * otherPortion;
 
         // Clear arrays
         for (let i = 0; i < pathLength; i++) {
@@ -1176,8 +1260,8 @@ const AudioVisualizer: React.FC = () => {
             // Calculate which section this path point belongs to
             const pathProgress = i / (pathLength - 1);
 
-            // Extra boost for sub-bass section (first 20% of visible particles)
-            if (pathProgress <= 0.2) {
+            // Extra boost for sub-bass section (first 10% of visible particles)
+            if (pathProgress <= subBassPortion) {
               baseRadius += subBassAvg * subBassAvg * 120;
               if (bassHit && Math.random() > 0.6) {
                 baseRadius *= 1.2 + Math.random() * 0.3;
@@ -1190,13 +1274,19 @@ const AudioVisualizer: React.FC = () => {
             const pathProgress = i / (pathLength - 1);
             let sectionAvg = 0;
 
-            if (pathProgress <= 0.2) {
+            if (pathProgress <= subBassPortion) {
               sectionAvg = subBassAvg;
-            } else if (pathProgress <= 0.4) {
+            } else if (pathProgress <= subBassPortion + lowBassPortion) {
               sectionAvg = lowBassAvg;
-            } else if (pathProgress <= 0.6) {
+            } else if (
+              pathProgress <=
+              subBassPortion + lowBassPortion + otherPortion
+            ) {
               sectionAvg = lowMidAvg;
-            } else if (pathProgress <= 0.8) {
+            } else if (
+              pathProgress <=
+              subBassPortion + lowBassPortion + otherPortion * 2
+            ) {
               sectionAvg = highMidAvg;
             } else {
               sectionAvg = highAvg;
@@ -1237,6 +1327,7 @@ const AudioVisualizer: React.FC = () => {
             Math.sin(anim.noiseOffset * 5 + anim.randomSeed) * 0.05;
 
           particles.material.uniforms.uParticleScale.value = particleScale;
+          particles.material.uniforms.uSubBassAvg.value = subBassAvg;
           particles.material.uniforms.uRadius.needsUpdate = true;
           particles.material.uniforms.uShake.needsUpdate = true;
           particles.material.uniforms.uRotation.needsUpdate = true;
@@ -1460,7 +1551,7 @@ const AudioVisualizer: React.FC = () => {
       <audio
         ref={audioRef}
         crossOrigin="anonymous"
-        src={immortal_eprom}
+        src={aud}
         onEnded={() => {
           setIsPlaying(false);
           isPlayingRef.current = false;
@@ -1494,9 +1585,70 @@ const AudioVisualizer: React.FC = () => {
 };
 
 export default AudioVisualizer;
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
 
-// import React, { useEffect, useRef, useState } from "react";
-// import * as THREE from "three";
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
+
+/* -------------------------------------------------------------------------- */
+/*                                     OLD                                    */
+/* -------------------------------------------------------------------------- */
 
 // // Particle color configuration - Easy to change!
 // const PARTICLE_COLOR = {
@@ -1519,6 +1671,8 @@ export default AudioVisualizer;
 //     color3: { r: 1, g: 1, b: 1 },
 //   },
 // };
+
+// const aud = holdmedown_borne;
 
 // // Camera Controller
 // class CameraController {
@@ -1745,24 +1899,24 @@ export default AudioVisualizer;
 
 // const BASS_CONFIG = {
 //   // 5 frequency sections
-//   subBassIntensity: 1, // 20-60 Hz
-//   lowBassIntensity: 0.9, // 60-250 Hz
-//   lowMidIntensity: 1, // 250-500 Hz
-//   highMidIntensity: 0.8, // 500-2000 Hz
-//   highIntensity: 0.6, // 2000+ Hz
+//   subBassIntensity: 0.5, // 20-60 Hz
+//   lowBassIntensity: 0.6, // 60-250 Hz
+//   lowMidIntensity: 0.8, // 250-500 Hz
+//   highMidIntensity: 0.9, // 500-2000 Hz
+//   highIntensity: 0.7, // 2000+ Hz
 
-//   radiusMultiplier: 17,
-//   radiusPower: 30,
-//   particleScaleMax: 1.75,
-//   roundnessMultiplier: 8,
+//   radiusMultiplier: 15,
+//   radiusPower: 8,
+//   particleScaleMax: 2,
+//   roundnessMultiplier: 4,
 //   lightIntensityMultiplier: 6,
-//   rotationSpeedMax: 2,
+//   rotationSpeedMax: 3,
 //   enableColorShift: true,
 
 //   // Shake parameters for sub-bass
-//   subBassShakeIntensity: 10, // Erratic shake multiplier
+//   subBassShakeIntensity: 8, // Erratic shake multiplier
 //   // Rotation for sub-bass
-//   subBassRotationIntensity: 0.6, // Spine rotation intensity
+//   subBassRotationIntensity: 1, // Spine rotation intensity
 // };
 
 // // Helper functions
@@ -2335,7 +2489,7 @@ export default AudioVisualizer;
 //         const highMidEnd = Math.floor(2000 / binHz); // 500-2000 Hz
 //         // Everything above 2000 Hz is highs
 
-//         // Calculate averages for each band
+//         // Calculate averages for each band with full stereo analysis
 //         let subBassTotal = 0,
 //           lowBassTotal = 0,
 //           lowMidTotal = 0,
@@ -2343,6 +2497,14 @@ export default AudioVisualizer;
 //           highTotal = 0;
 //         let subBassLeft = 0,
 //           subBassRight = 0;
+//         let lowBassLeft = 0,
+//           lowBassRight = 0;
+//         let lowMidLeft = 0,
+//           lowMidRight = 0;
+//         let highMidLeft = 0,
+//           highMidRight = 0;
+//         let highLeft = 0,
+//           highRight = 0;
 
 //         // Sub-bass with stereo analysis
 //         for (let i = 0; i < subBassEnd; i++) {
@@ -2356,42 +2518,73 @@ export default AudioVisualizer;
 //         let subBassLeftAvg = subBassLeft / Math.max(1, subBassEnd) / 255;
 //         let subBassRightAvg = subBassRight / Math.max(1, subBassEnd) / 255;
 
-//         // Calculate stereo pan for sub-bass (-1 = left, 0 = center, 1 = right)
-//         let subBassPan = 0;
-//         if (subBassLeftAvg + subBassRightAvg > 0.01) {
-//           subBassPan =
-//             (subBassRightAvg - subBassLeftAvg) /
-//             (subBassLeftAvg + subBassRightAvg);
-//         }
-
-//         // Other frequency bands
+//         // Low bass with stereo
 //         for (let i = subBassEnd; i < lowBassEnd; i++) {
 //           lowBassTotal += data[i];
+//           lowBassLeft += dataLeft[i];
+//           lowBassRight += dataRight[i];
 //         }
 //         let lowBassAvg =
 //           (lowBassTotal / Math.max(1, lowBassEnd - subBassEnd) / 255) *
 //           BASS_CONFIG.lowBassIntensity;
+//         let lowBassLeftAvg =
+//           lowBassLeft / Math.max(1, lowBassEnd - subBassEnd) / 255;
+//         let lowBassRightAvg =
+//           lowBassRight / Math.max(1, lowBassEnd - subBassEnd) / 255;
 
+//         // Low mids with stereo
 //         for (let i = lowBassEnd; i < lowMidEnd; i++) {
 //           lowMidTotal += data[i];
+//           lowMidLeft += dataLeft[i];
+//           lowMidRight += dataRight[i];
 //         }
 //         let lowMidAvg =
 //           (lowMidTotal / Math.max(1, lowMidEnd - lowBassEnd) / 255) *
 //           BASS_CONFIG.lowMidIntensity;
+//         let lowMidLeftAvg =
+//           lowMidLeft / Math.max(1, lowMidEnd - lowBassEnd) / 255;
+//         let lowMidRightAvg =
+//           lowMidRight / Math.max(1, lowMidEnd - lowBassEnd) / 255;
 
+//         // High mids with stereo
 //         for (let i = lowMidEnd; i < highMidEnd; i++) {
 //           highMidTotal += data[i];
+//           highMidLeft += dataLeft[i];
+//           highMidRight += dataRight[i];
 //         }
 //         let highMidAvg =
 //           (highMidTotal / Math.max(1, highMidEnd - lowMidEnd) / 255) *
 //           BASS_CONFIG.highMidIntensity;
+//         let highMidLeftAvg =
+//           highMidLeft / Math.max(1, highMidEnd - lowMidEnd) / 255;
+//         let highMidRightAvg =
+//           highMidRight / Math.max(1, highMidEnd - lowMidEnd) / 255;
 
+//         // Highs with stereo
 //         for (let i = highMidEnd; i < cap; i++) {
 //           highTotal += data[i];
+//           highLeft += dataLeft[i];
+//           highRight += dataRight[i];
 //         }
 //         let highAvg =
 //           (highTotal / Math.max(1, cap - highMidEnd) / 255) *
 //           BASS_CONFIG.highIntensity;
+//         let highLeftAvg = highLeft / Math.max(1, cap - highMidEnd) / 255;
+//         let highRightAvg = highRight / Math.max(1, cap - highMidEnd) / 255;
+
+//         // Calculate stereo pan for each band (-1 = left, 0 = center, 1 = right)
+//         const calculatePan = (left: number, right: number) => {
+//           if (left + right > 0.01) {
+//             return (right - left) / (left + right);
+//           }
+//           return 0;
+//         };
+
+//         let subBassPan = calculatePan(subBassLeftAvg, subBassRightAvg);
+//         let lowBassPan = calculatePan(lowBassLeftAvg, lowBassRightAvg);
+//         let lowMidPan = calculatePan(lowMidLeftAvg, lowMidRightAvg);
+//         let highMidPan = calculatePan(highMidLeftAvg, highMidRightAvg);
+//         let highPan = calculatePan(highLeftAvg, highRightAvg);
 
 //         // Add noise to frequency averages
 //         subBassAvg +=
@@ -2589,7 +2782,7 @@ export default AudioVisualizer;
 //                     subBassAvg *
 //                     BASS_CONFIG.subBassRotationIntensity;
 
-//                   // Stereo pan
+//                   // Stereo pan for sub-bass
 //                   panArray[pathIndex] = subBassPan * subBassAvg;
 
 //                   // Extra effects on bass hit
@@ -2599,6 +2792,18 @@ export default AudioVisualizer;
 //                     shakeArray[pathIndex * 3 + 2] *= 1.5;
 //                     rotationArray[pathIndex] *= 2.0;
 //                   }
+//                 } else if (progressAlongPath < lowBassThreshold) {
+//                   // Low bass section - pan only
+//                   panArray[pathIndex] = lowBassPan * lowBassAvg;
+//                 } else if (progressAlongPath < lowMidThreshold) {
+//                   // Low mid section - pan only
+//                   panArray[pathIndex] = lowMidPan * lowMidAvg;
+//                 } else if (progressAlongPath < highMidThreshold) {
+//                   // High mid section - pan only
+//                   panArray[pathIndex] = highMidPan * highMidAvg;
+//                 } else {
+//                   // High section - pan only
+//                   panArray[pathIndex] = highPan * highAvg;
 //                 }
 //               }
 //             }
@@ -2606,8 +2811,9 @@ export default AudioVisualizer;
 //         }
 
 //         // Update radius array based on processed data
-//         for (let i = 0; i < dataArray.length && i < pathLength; i++) {
-//           if (i && dataArray.length - i > 1) {
+//         for (let i = 0; i < pathLength; i++) {
+//           // Make sure we have data for this index
+//           if (i < dataArray.length) {
 //             let val = dataArray[i] / 255;
 //             val += Math.sin(anim.noiseOffset * 4 + i * 0.2) * 0.02;
 //             val = Math.max(0, Math.min(1, val));
@@ -2617,16 +2823,11 @@ export default AudioVisualizer;
 //               BASS_CONFIG.radiusMultiplier;
 //             baseRadius += (Math.random() - 0.5) * 2;
 
-//             const segmentIndex = i % (cap * 2);
-//             const segmentDelay = segmentIndex * prefabDelay;
-//             const timeInPath = currentTime - segmentDelay;
-//             const progressAlongPath = Math.min(
-//               1.0,
-//               Math.max(0.0, timeInPath / avgDuration),
-//             );
+//             // Calculate which section this path point belongs to
+//             const pathProgress = i / (pathLength - 1);
 
-//             // Extra boost for sub-bass section
-//             if (progressAlongPath <= subBassThreshold || timeInPath < 0) {
+//             // Extra boost for sub-bass section (first 20% of visible particles)
+//             if (pathProgress <= 0.2) {
 //               baseRadius += subBassAvg * subBassAvg * 120;
 //               if (bassHit && Math.random() > 0.6) {
 //                 baseRadius *= 1.2 + Math.random() * 0.3;
@@ -2635,7 +2836,28 @@ export default AudioVisualizer;
 
 //             radiusArray[i] = Math.max(1, baseRadius);
 //           } else {
-//             radiusArray[i] = 128;
+//             // For any remaining path points, use the frequency section averages
+//             const pathProgress = i / (pathLength - 1);
+//             let sectionAvg = 0;
+
+//             if (pathProgress <= 0.2) {
+//               sectionAvg = subBassAvg;
+//             } else if (pathProgress <= 0.4) {
+//               sectionAvg = lowBassAvg;
+//             } else if (pathProgress <= 0.6) {
+//               sectionAvg = lowMidAvg;
+//             } else if (pathProgress <= 0.8) {
+//               sectionAvg = highMidAvg;
+//             } else {
+//               sectionAvg = highAvg;
+//             }
+
+//             let baseRadius =
+//               Math.pow(sectionAvg, BASS_CONFIG.radiusPower) *
+//               BASS_CONFIG.radiusMultiplier;
+//             baseRadius += (Math.random() - 0.5) * 2;
+
+//             radiusArray[i] = Math.max(10, baseRadius);
 //           }
 //         }
 
@@ -2888,7 +3110,7 @@ export default AudioVisualizer;
 //       <audio
 //         ref={audioRef}
 //         crossOrigin="anonymous"
-//         src={"https://audio.jukehost.co.uk/Yszr2ZqGhoNJNAGTEPFQGB5AtMXCSwjw"}
+//         src={aud}
 //         onEnded={() => {
 //           setIsPlaying(false);
 //           isPlayingRef.current = false;
