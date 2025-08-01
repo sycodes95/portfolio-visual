@@ -290,11 +290,11 @@ const AudioVisualizer: React.FC = () => {
   const [debugInfo, setDebugInfo] = useState("Loading...");
   const isPlayingRef = useRef(false);
 
-  const pathLength = 256;
+  const pathLength = 128;
   const particleCount = 100000;
-  const prefabDelay = 0.00044;
+  const prefabDelay = 0.00014;
   // const prefabDelay = 0.00444;
-  const vertexDelay = 0.001;
+  const vertexDelay = 0.005;
   // const vertexDelay = 0.000005;
   const minDuration = 40;
   const maxDuration = 600;
@@ -320,7 +320,7 @@ const AudioVisualizer: React.FC = () => {
       60,
       window.innerWidth / window.innerHeight,
       0.1,
-      5000,
+      10000,
     );
     camera.position.set(0, 0, 1200);
 

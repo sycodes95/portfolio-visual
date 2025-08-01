@@ -1,6 +1,122 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+
+// Particle color configuration - Easy to change!
+const PARTICLE_COLOR = {
+  // Main particle color (RGB values 0-1)
+  r: 1.0, // Red
+  g: 1.0, // Green
+  b: 1.0, // Blue
+
+  // Emissive glow color
+  emissive: {
+    r: 1.0,
+    g: 1.0,
+    b: 1.0,
+  },
+
+  // Light colors (set to white for natural lighting, or match particle color)
+  lights: {
+    color1: { r: 1, g: 1, b: 1 }, // White lighting
+    color2: { r: 1, g: 1, b: 1 },
+    color3: { r: 1, g: 1, b: 1 },
+  },
+};
+
+// Camera Controller
+class CameraController {
+  camera: THREE.PerspectiveCamera;
+  domElement: HTMLElement;
+  autoRotate = true;
+  autoRotateSpeed = 0.1;
+  rotationY = 0;
+  targetDistance = 1200;
+  distance = 1200;
+  isDragging = false;
+  previousMouseX = 0;
+  previousMouseY = 0;
+  spherical = new THREE.Spherical();
+  minDistance = 50;
+  maxDistance = 1500;
+  minPolarAngle = Math.PI * 0.4;
+  maxPolarAngle = Math.PI * 0.6;
+
+  constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement) {
+    this.camera = camera;
+    this.domElement = domElement;
+
+    this.distance = 1200;
+    this.targetDistance = 1200;
+    this.rotationY = 0;
+
+    this.domElement.addEventListener("wheel", this.onWheel.bind(this));
+    this.domElement.addEventListener("mousedown", this.onMouseDown.bind(this));
+    this.domElement.addEventListener("mousemove", this.onMouseMove.bind(this));
+    this.domElement.addEventListener("mouseup", this.onMouseUp.bind(this));
+    this.domElement.addEventListener("mouseleave", this.onMouseUp.bind(this));
+  }
+
+  onWheel(e: WheelEvent) {
+    e.preventDefault();
+    this.targetDistance += e.deltaY * 0.5;
+    this.targetDistance = Math.max(
+      this.minDistance,
+      Math.min(this.maxDistance, this.targetDistance),
+    );
+  }
+
+  onMouseDown(e: MouseEvent) {
+    this.isDragging = true;
+    this.previousMouseX = e.clientX;
+    this.previousMouseY = e.clientY;
+  }
+
+  onMouseMove(e: MouseEvent) {
+    if (!this.isDragging) return;
+
+    const deltaX = e.clientX - this.previousMouseX;
+    const deltaY = e.clientY - this.previousMouseY;
+
+    this.rotationY -= deltaX * 0.01;
+
+    this.previousMouseX = e.clientX;
+    this.previousMouseY = e.clientY;
+  }
+
+  onMouseUp() {
+    this.isDragging = false;
+  }
+
+  update() {
+    if (this.autoRotate && !this.isDragging) {
+      this.rotationY += this.autoRotateSpeed * 0.005;
+    }
+
+    this.distance += (this.targetDistance - this.distance) * 0.05;
+
+    this.camera.position.x = Math.sin(this.rotationY) * this.distance;
+    this.camera.position.z = Math.cos(this.rotationY) * this.distance;
+    this.camera.position.y = 0;
+    this.camera.lookAt(0, 0, 0);
+  }
+
+  dispose() {
+    this.domElement.removeEventListener("wheel", this.onWheel.bind(this));
+    this.domElement.removeEventListener(
+      "mousedown",
+      this.onMouseDown.bind(this),
+    );
+    this.domElement.removeEventListener(
+      "mousemove",
+      this.onMouseMove.bind(this),
+    );
+    this.domElement.removeEventListener("mouseup", this.onMouseUp.bind(this));
+    this.domElement.removeEventListener(
+      "mouseleave",
+      this.onMouseUp.bind(this),
+    );
+  }
+}
 
 // Audio Analyzer (matching original SpectrumAnalyzer)
 class AudioAnalyzer {
@@ -85,15 +201,70 @@ class AudioAnalyzer {
 const BASS_CONFIG = {
   bassIntensity: 0.7,
   midIntensity: 0.6,
-  highIntensity: 0.6,
-  radiusMultiplier: 12,
-  radiusPower: 22,
-  particleScaleMax: 2,
-  roundnessMultiplier: 8,
+  highIntensity: 0.9,
+  radiusMultiplier: 6,
+  radiusPower: 10,
+  particleScaleMax: 1.5,
+  roundnessMultiplier: 6,
   lightIntensityMultiplier: 6,
-  rotationSpeedMax: 16,
+  rotationSpeedMax: 2,
   enableColorShift: true,
+  // Shake parameters for bass
+  bassShakeIntensity: 2, // Erratic shake multiplier
 };
+
+// Helper functions
+function catmullRom(
+  p0: number,
+  p1: number,
+  p2: number,
+  p3: number,
+  t: number,
+): number {
+  const v0 = (p2 - p0) * 0.5;
+  const v1 = (p3 - p1) * 0.5;
+  const t2 = t * t;
+  const t3 = t * t * t;
+  return (
+    (2.0 * p1 - 2.0 * p2 + v0 + v1) * t3 +
+    (-3.0 * p1 + 3.0 * p2 - 2.0 * v0 - v1) * t2 +
+    v0 * t +
+    p1
+  );
+}
+
+function catmullRomVec3(
+  p0: THREE.Vector3,
+  p1: THREE.Vector3,
+  p2: THREE.Vector3,
+  p3: THREE.Vector3,
+  t: number,
+  roundness: THREE.Vector2,
+): THREE.Vector3 {
+  const v0 = new THREE.Vector3().subVectors(p2, p0).multiplyScalar(roundness.x);
+  const v1 = new THREE.Vector3().subVectors(p3, p1).multiplyScalar(roundness.y);
+  const t2 = t * t;
+  const t3 = t * t * t;
+
+  const result = new THREE.Vector3();
+  result.x =
+    (2.0 * p1.x - 2.0 * p2.x + v0.x + v1.x) * t3 +
+    (-3.0 * p1.x + 3.0 * p2.x - 2.0 * v0.x - v1.x) * t2 +
+    v0.x * t +
+    p1.x;
+  result.y =
+    (2.0 * p1.y - 2.0 * p2.y + v0.y + v1.y) * t3 +
+    (-3.0 * p1.y + 3.0 * p2.y - 2.0 * v0.y - v1.y) * t2 +
+    v0.y * t +
+    p1.y;
+  result.z =
+    (2.0 * p1.z - 2.0 * p2.z + v0.z + v1.z) * t3 +
+    (-3.0 * p1.z + 3.0 * p2.z - 2.0 * v0.z - v1.z) * t2 +
+    v0.z * t +
+    p1.z;
+
+  return result;
+}
 
 const AudioVisualizer: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -102,8 +273,11 @@ const AudioVisualizer: React.FC = () => {
     scene: THREE.Scene;
     camera: THREE.PerspectiveCamera;
     renderer: THREE.WebGLRenderer;
-    controls: any;
+    controls: CameraController;
     particles: THREE.Mesh;
+    pathPositions: Float32Array;
+    radiusArray: Float32Array;
+    shakeArray: Float32Array; // New array for shake offsets
     analyzer?: AudioAnalyzer;
     lights: {
       light1: THREE.PointLight;
@@ -116,9 +290,12 @@ const AudioVisualizer: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayButton, setShowPlayButton] = useState(true);
   const [debugInfo, setDebugInfo] = useState("Loading...");
+  const isPlayingRef = useRef(false);
 
-  const pathLength = 256;
-  const particleCount = 77777;
+  const pathLength = 128;
+  const particleCount = 100000;
+  const prefabDelay = 0.00014;
+  const vertexDelay = 0.005;
   const minDuration = 40;
   const maxDuration = 600;
 
@@ -128,313 +305,13 @@ const AudioVisualizer: React.FC = () => {
     randomSeed: Math.random() * 1000,
     previousBassAvg: 0,
     bassHitTime: 0,
+    shakePhase: 0, // For erratic shake animation
   });
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    console.log("Initializing 77,777 particle system...");
-
-    // Define THREE.BAS from vanilla JS
-    THREE.BAS = {};
-
-    THREE.BAS.ShaderChunk = {};
-
-    THREE.BAS.ShaderChunk["animation_time"] =
-      "float tDelay = aAnimation.x;\nfloat tDuration = aAnimation.y;\nfloat tTime = clamp(uTime - tDelay, 0.0, tDuration);\nfloat tProgress = ease(tTime, 0.0, 1.0, tDuration);\n";
-
-    THREE.BAS.ShaderChunk["catmull-rom"] =
-      "vec3 catmullRom(vec3 p0, vec3 p1, vec3 p2, vec3 p3, float t)\n{\n    vec3 v0 = (p2 - p0) * 0.5;\n    vec3 v1 = (p3 - p1) * 0.5;\n    float t2 = t * t;\n    float t3 = t * t * t;\n\n    return vec3((2.0 * p1 - 2.0 * p2 + v0 + v1) * t3 + (-3.0 * p1 + 3.0 * p2 - 2.0 * v0 - v1) * t2 + v0 * t + p1);\n}\n\nvec3 catmullRom(vec3 p0, vec3 p1, vec3 p2, vec3 p3, vec2 c, float t)\n{\n    vec3 v0 = (p2 - p0) * c.x;\n    vec3 v1 = (p3 - p1) * c.y;\n    float t2 = t * t;\n    float t3 = t * t * t;\n\n    return vec3((2.0 * p1 - 2.0 * p2 + v0 + v1) * t3 + (-3.0 * p1 + 3.0 * p2 - 2.0 * v0 - v1) * t2 + v0 * t + p1);\n}\n\nfloat catmullRom(float p0, float p1, float p2, float p3, float t)\n{\n    float v0 = (p2 - p0) * 0.5;\n    float v1 = (p3 - p1) * 0.5;\n    float t2 = t * t;\n    float t3 = t * t * t;\n\n    return float((2.0 * p1 - 2.0 * p2 + v0 + v1) * t3 + (-3.0 * p1 + 3.0 * p2 - 2.0 * v0 - v1) * t2 + v0 * t + p1);\n}\n\nfloat catmullRom(float p0, float p1, float p2, float p3, vec2 c, float t)\n{\n    float v0 = (p2 - p0) * c.x;\n    float v1 = (p3 - p1) * c.y;\n    float t2 = t * t;\n    float t3 = t * t * t;\n\n    return float((2.0 * p1 - 2.0 * p2 + v0 + v1) * t3 + (-3.0 * p1 + 3.0 * p2 - 2.0 * v0 - v1) * t2 + v0 * t + p1);\n}\n";
-
-    THREE.BAS.ShaderChunk["cubic_bezier"] =
-      "vec3 cubicBezier(vec3 p0, vec3 c0, vec3 c1, vec3 p1, float t)\n{\n    vec3 tp;\n    float tn = 1.0 - t;\n\n    tp.xyz = tn * tn * tn * p0.xyz + 3.0 * tn * tn * t * c0.xyz + 3.0 * tn * t * t * c1.xyz + t * t * t * p1.xyz;\n\n    return tp;\n}\n";
-
-    THREE.BAS.ShaderChunk["ease_in_cubic"] =
-      "float ease(float t, float b, float c, float d) {\n  return c*(t/=d)*t*t + b;\n}\n";
-
-    THREE.BAS.ShaderChunk["ease_in_out_cubic"] =
-      "float ease(float t, float b, float c, float d) {\n  if ((t/=d/2.0) < 1.0) return c/2.0*t*t*t + b;\n  return c/2.0*((t-=2.0)*t*t + 2.0) + b;\n}\n";
-
-    THREE.BAS.ShaderChunk["ease_in_quad"] =
-      "float ease(float t, float b, float c, float d) {\n  return c*(t/=d)*t + b;\n}\n";
-
-    THREE.BAS.ShaderChunk["ease_out_cubic"] =
-      "float ease(float t, float b, float c, float d) {\n  return c*((t=t/d - 1.0)*t*t + 1.0) + b;\n}\n";
-
-    THREE.BAS.ShaderChunk["quaternion_rotation"] =
-      "vec3 rotateVector(vec4 q, vec3 v)\n{\n    return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);\n}\n\nvec4 quatFromAxisAngle(vec3 axis, float angle)\n{\n    float halfAngle = angle * 0.5;\n    return vec4(axis.xyz * sin(halfAngle), cos(halfAngle));\n}\n";
-
-    THREE.BAS.PrefabBufferGeometry = function (prefab, count) {
-      THREE.BufferGeometry.call(this);
-      this.prefabGeometry = prefab;
-      this.prefabCount = count;
-      this.prefabVertexCount = prefab.vertices.length;
-      this.bufferDefaults();
-    };
-    THREE.BAS.PrefabBufferGeometry.prototype = Object.create(
-      THREE.BufferGeometry.prototype,
-    );
-    THREE.BAS.PrefabBufferGeometry.prototype.constructor =
-      THREE.BAS.PrefabBufferGeometry;
-
-    THREE.BAS.PrefabBufferGeometry.prototype.bufferDefaults = function () {
-      var prefabFaceCount = this.prefabGeometry.faces.length;
-      var prefabIndexCount = this.prefabGeometry.faces.length * 3;
-      var prefabVertexCount = (this.prefabVertexCount =
-        this.prefabGeometry.vertices.length);
-      var prefabIndices = [];
-      for (var h = 0; h < prefabFaceCount; h++) {
-        var face = this.prefabGeometry.faces[h];
-        prefabIndices.push(face.a, face.b, face.c);
-      }
-      var indexBuffer = new Uint32Array(this.prefabCount * prefabIndexCount);
-      var positionBuffer = new Float32Array(
-        this.prefabCount * prefabVertexCount * 3,
-      );
-      this.setIndex(new THREE.BufferAttribute(indexBuffer, 1));
-      this.addAttribute(
-        "position",
-        new THREE.BufferAttribute(positionBuffer, 3),
-      );
-      for (var i = 0, offset = 0; i < this.prefabCount; i++) {
-        for (var j = 0; j < prefabVertexCount; j++, offset += 3) {
-          var prefabVertex = this.prefabGeometry.vertices[j];
-          positionBuffer[offset] = prefabVertex.x;
-          positionBuffer[offset + 1] = prefabVertex.y;
-          positionBuffer[offset + 2] = prefabVertex.z;
-        }
-        for (var k = 0; k < prefabIndexCount; k++) {
-          indexBuffer[i * prefabIndexCount + k] =
-            prefabIndices[k] + i * prefabVertexCount;
-        }
-      }
-    };
-
-    THREE.BAS.PrefabBufferGeometry.prototype.bufferUvs = function () {
-      var prefabFaceCount = this.prefabGeometry.faces.length;
-      var prefabVertexCount = (this.prefabVertexCount =
-        this.prefabGeometry.vertices.length);
-      var prefabUvs = [];
-      for (var h = 0; h < prefabFaceCount; h++) {
-        var face = this.prefabGeometry.faces[h];
-        var uv = this.prefabGeometry.faceVertexUvs[0][h];
-        prefabUvs[face.a] = uv[0];
-        prefabUvs[face.b] = uv[1];
-        prefabUvs[face.c] = uv[2];
-      }
-      var uvBuffer = this.createAttribute("uv", 2);
-      for (var i = 0, offset = 0; i < this.prefabCount; i++) {
-        for (var j = 0; j < prefabVertexCount; j++, offset += 2) {
-          var prefabUv = prefabUvs[j];
-          uvBuffer.array[offset] = prefabUv.x;
-          uvBuffer.array[offset + 1] = prefabUv.y;
-        }
-      }
-    };
-
-    THREE.BAS.PrefabBufferGeometry.prototype.createAttribute = function (
-      name,
-      itemSize,
-    ) {
-      var buffer = new Float32Array(
-        this.prefabCount * this.prefabVertexCount * itemSize,
-      );
-      var attribute = new THREE.BufferAttribute(buffer, itemSize);
-      this.addAttribute(name, attribute);
-      return attribute;
-    };
-
-    THREE.BAS.PrefabBufferGeometry.prototype.setAttribute4 = function (
-      name,
-      data,
-    ) {
-      var offset = 0;
-      var array = this.attributes[name].array;
-      var i, j;
-      for (i = 0; i < data.length; i++) {
-        var v = data[i];
-        for (j = 0; j < this.prefabVertexCount; j++) {
-          array[offset++] = v.x;
-          array[offset++] = v.y;
-          array[offset++] = v.z;
-          array[offset++] = v.w;
-        }
-      }
-      this.attributes[name].needsUpdate = true;
-    };
-
-    THREE.BAS.PrefabBufferGeometry.prototype.setAttribute3 = function (
-      name,
-      data,
-    ) {
-      var offset = 0;
-      var array = this.attributes[name].array;
-      var i, j;
-      for (i = 0; i < data.length; i++) {
-        var v = data[i];
-        for (j = 0; j < this.prefabVertexCount; j++) {
-          array[offset++] = v.x;
-          array[offset++] = v.y;
-          array[offset++] = v.z;
-        }
-      }
-      this.attributes[name].needsUpdate = true;
-    };
-
-    THREE.BAS.PrefabBufferGeometry.prototype.setAttribute2 = function (
-      name,
-      data,
-    ) {
-      var offset = 0;
-      var array = this.attributes[name].array;
-      var i, j;
-      for (i = 0; i < this.prefabCount; i++) {
-        var v = data[i];
-        for (j = 0; j < this.prefabVertexCount; j++) {
-          array[offset++] = v.x;
-          array[offset++] = v.y;
-        }
-      }
-      this.attributes[name].needsUpdate = true;
-    };
-
-    THREE.BAS.BaseAnimationMaterial = function (parameters) {
-      THREE.ShaderMaterial.call(this);
-      this.shaderFunctions = [];
-      this.shaderParameters = [];
-      this.shaderVertexInit = [];
-      this.shaderTransformNormal = [];
-      this.shaderTransformPosition = [];
-      this.setValues(parameters);
-    };
-    THREE.BAS.BaseAnimationMaterial.prototype = Object.create(
-      THREE.ShaderMaterial.prototype,
-    );
-    THREE.BAS.BaseAnimationMaterial.prototype.constructor =
-      THREE.BAS.BaseAnimationMaterial;
-
-    THREE.BAS.BaseAnimationMaterial.prototype._concatVertexShader =
-      function () {
-        return "";
-      };
-
-    THREE.BAS.BaseAnimationMaterial.prototype._concatFunctions = function () {
-      return this.shaderFunctions.join("\n");
-    };
-
-    THREE.BAS.BaseAnimationMaterial.prototype._concatParameters = function () {
-      return this.shaderParameters.join("\n");
-    };
-
-    THREE.BAS.BaseAnimationMaterial.prototype._concatVertexInit = function () {
-      return this.shaderVertexInit.join("\n");
-    };
-
-    THREE.BAS.BaseAnimationMaterial.prototype._concatTransformNormal =
-      function () {
-        return this.shaderTransformNormal.join("\n");
-      };
-
-    THREE.BAS.BaseAnimationMaterial.prototype._concatTransformPosition =
-      function () {
-        return this.shaderTransformPosition.join("\n");
-      };
-
-    THREE.BAS.BaseAnimationMaterial.prototype.setUniformValues = function (
-      values,
-    ) {
-      for (var key in values) {
-        if (key in this.uniforms) {
-          var uniform = this.uniforms[key];
-          var value = values[key];
-          switch (uniform.type) {
-            case "c":
-              uniform.value.set(value);
-              break;
-            case "v2":
-            case "v3":
-            case "v4":
-              uniform.value.copy(value);
-              break;
-            case "f":
-            case "t":
-            default:
-              uniform.value = value;
-          }
-        }
-      }
-    };
-
-    THREE.BAS.PhongAnimationMaterial = function (parameters, uniformValues) {
-      THREE.BAS.BaseAnimationMaterial.call(this, parameters);
-      var phongShader = THREE.ShaderLib["phong"];
-      this.uniforms = THREE.UniformsUtils.merge([
-        phongShader.uniforms,
-        this.uniforms,
-      ]);
-      this.lights = true;
-      this.vertexShader = this._concatVertexShader();
-      this.fragmentShader = phongShader.fragmentShader;
-      uniformValues.map && (this.defines["USE_MAP"] = "");
-      uniformValues.normalMap && (this.defines["USE_NORMALMAP"] = "");
-      this.setUniformValues(uniformValues);
-    };
-    THREE.BAS.PhongAnimationMaterial.prototype = Object.create(
-      THREE.BAS.BaseAnimationMaterial.prototype,
-    );
-    THREE.BAS.PhongAnimationMaterial.prototype.constructor =
-      THREE.BAS.PhongAnimationMaterial;
-
-    THREE.BAS.PhongAnimationMaterial.prototype._concatVertexShader =
-      function () {
-        return [
-          "#define PHONG",
-          "varying vec3 vViewPosition;",
-          "#ifndef FLAT_SHADED",
-          "	varying vec3 vNormal;",
-          "#endif",
-          THREE.ShaderChunk["common"],
-          THREE.ShaderChunk["uv_pars_vertex"],
-          THREE.ShaderChunk["uv2_pars_vertex"],
-          THREE.ShaderChunk["displacementmap_pars_vertex"],
-          THREE.ShaderChunk["envmap_pars_vertex"],
-          THREE.ShaderChunk["lights_phong_pars_vertex"],
-          THREE.ShaderChunk["color_pars_vertex"],
-          THREE.ShaderChunk["morphtarget_pars_vertex"],
-          THREE.ShaderChunk["skinning_pars_vertex"],
-          THREE.ShaderChunk["shadowmap_pars_vertex"],
-          THREE.ShaderChunk["logdepthbuf_pars_vertex"],
-          this._concatFunctions(),
-          this._concatParameters(),
-          "void main() {",
-          this._concatVertexInit(),
-          THREE.ShaderChunk["uv_vertex"],
-          THREE.ShaderChunk["uv2_vertex"],
-          THREE.ShaderChunk["color_vertex"],
-          THREE.ShaderChunk["beginnormal_vertex"],
-          this._concatTransformNormal(),
-          THREE.ShaderChunk["morphnormal_vertex"],
-          THREE.ShaderChunk["skinbase_vertex"],
-          THREE.ShaderChunk["skinnormal_vertex"],
-          THREE.ShaderChunk["defaultnormal_vertex"],
-          "#ifndef FLAT_SHADED",
-          "	vNormal = normalize(transformedNormal);",
-          "#endif",
-          THREE.ShaderChunk["begin_vertex"],
-          this._concatTransformPosition(),
-          THREE.ShaderChunk["displacementmap_vertex"],
-          THREE.ShaderChunk["morphtarget_vertex"],
-          THREE.ShaderChunk["skinning_vertex"],
-          THREE.ShaderChunk["project_vertex"],
-          THREE.ShaderChunk["logdepthbuf_vertex"],
-          "	vViewPosition = - mvPosition.xyz;",
-          THREE.ShaderChunk["worldpos_vertex"],
-          THREE.ShaderChunk["envmap_vertex"],
-          THREE.ShaderChunk["lights_phong_vertex"],
-          THREE.ShaderChunk["shadowmap_vertex"],
-          "}",
-        ].join("\n");
-      };
+    console.log("Initializing 100,000 particle system...");
 
     // Scene setup
     const scene = new THREE.Scene();
@@ -444,7 +321,7 @@ const AudioVisualizer: React.FC = () => {
       60,
       window.innerWidth / window.innerHeight,
       0.1,
-      5000,
+      10000,
     );
     camera.position.set(0, 0, 1200);
 
@@ -455,32 +332,41 @@ const AudioVisualizer: React.FC = () => {
     containerRef.current.appendChild(renderer.domElement);
 
     // Lights
-    const light1 = new THREE.PointLight(0xff0000, 0.25, 1200, 2);
+    const light1 = new THREE.PointLight(0xffffff, 0.25, 1200, 2);
     light1.position.set(0, 0, 0);
+    light1.color.setRGB(
+      PARTICLE_COLOR.lights.color1.r,
+      PARTICLE_COLOR.lights.color1.g,
+      PARTICLE_COLOR.lights.color1.b,
+    );
     scene.add(light1);
 
-    const light2 = new THREE.DirectionalLight(0xff0000, 0.25);
+    const light2 = new THREE.DirectionalLight(0xffffff, 0.25);
     light2.position.set(0, 1, 1);
+    light2.color.setRGB(
+      PARTICLE_COLOR.lights.color2.r,
+      PARTICLE_COLOR.lights.color2.g,
+      PARTICLE_COLOR.lights.color2.b,
+    );
     scene.add(light2);
 
-    const light3 = new THREE.DirectionalLight(0xff0000, 0.25);
+    const light3 = new THREE.DirectionalLight(0xffffff, 0.25);
     light3.position.set(0, 1, -1);
+    light3.color.setRGB(
+      PARTICLE_COLOR.lights.color3.r,
+      PARTICLE_COLOR.lights.color3.g,
+      PARTICLE_COLOR.lights.color3.b,
+    );
     scene.add(light3);
 
     // Camera controller
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.autoRotate = true;
-    controls.autoRotateSpeed = 2.0;
-    controls.enableZoom = true;
-    controls.enablePan = false;
-    controls.minDistance = 50;
-    controls.maxDistance = 1200;
-    controls.minPolarAngle = Math.PI * 0.4;
-    controls.maxPolarAngle = Math.PI * 0.6;
+    const controls = new CameraController(camera, renderer.domElement);
 
     // Create path
-    const pathArray: number[] = [];
-    const radiusArray: number[] = [];
+    const pathPositions = new Float32Array(pathLength * 3);
+    const radiusArray = new Float32Array(pathLength);
+    const shakeArray = new Float32Array(pathLength * 3); // x, y, z shake for each point
+
     for (let i = 0; i < pathLength; i++) {
       let x, y, z;
 
@@ -493,160 +379,325 @@ const AudioVisualizer: React.FC = () => {
         y = 1200;
         z = 0;
       } else {
-        x = THREE.Math.randFloatSpread(400);
-        y = -400 + (800 / pathLength) * i + THREE.Math.randFloatSpread(200);
-        z = THREE.Math.randFloatSpread(400);
+        x = (Math.random() - 0.5) * 400;
+        y = -400 + (800 / pathLength) * i + (Math.random() - 0.5) * 200;
+        z = (Math.random() - 0.5) * 400;
       }
 
-      pathArray.push(x, y, z);
-      radiusArray.push(0);
+      pathPositions[i * 3] = x;
+      pathPositions[i * 3 + 1] = y;
+      pathPositions[i * 3 + 2] = z;
+      radiusArray[i] = 0;
+      shakeArray[i * 3] = 0;
+      shakeArray[i * 3 + 1] = 0;
+      shakeArray[i * 3 + 2] = 0;
     }
 
     // Create prefab geometry (sphere)
     const prefabGeometry = new THREE.SphereGeometry(2, 4, 4);
-    const bufferGeometry = new THREE.BAS.PrefabBufferGeometry(
-      prefabGeometry,
-      particleCount,
-    );
 
-    const aDelayDuration = bufferGeometry.createAttribute("aDelayDuration", 2);
-    const aPivot = bufferGeometry.createAttribute("aPivot", 3);
-    const aAxisAngle = bufferGeometry.createAttribute("aAxisAngle", 4);
-    const aColor = bufferGeometry.createAttribute("color", 3);
+    // Extract vertices and indices from the BufferGeometry
+    const prefabPositions = prefabGeometry.attributes.position;
+    const prefabNormals = prefabGeometry.attributes.normal;
+    const prefabIndices = prefabGeometry.index;
 
-    let i, j, offset;
-    const prefabDelay = 0.00005;
-    const vertexDelay = 0.005;
-    for (i = 0, offset = 0; i < particleCount; i++) {
+    const verticesPerPrefab = prefabPositions.count;
+    const indicesPerPrefab = prefabIndices ? prefabIndices.count : 0;
+
+    const totalVertices = particleCount * verticesPerPrefab;
+    const totalIndices = particleCount * indicesPerPrefab;
+
+    // Create buffer geometry
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(totalVertices * 3);
+    const colors = new Float32Array(totalVertices * 3);
+    const normals = new Float32Array(totalVertices * 3);
+    const delayDurations = new Float32Array(totalVertices * 2);
+    const pivots = new Float32Array(totalVertices * 3);
+    const axisAngles = new Float32Array(totalVertices * 4);
+    const indices = new Uint32Array(totalIndices);
+
+    // Initialize attributes
+    for (let i = 0; i < particleCount; i++) {
       const delay = i * prefabDelay;
-      const duration = THREE.Math.randFloat(minDuration, maxDuration);
-      for (j = 0; j < prefabGeometry.vertices.length; j++) {
-        aDelayDuration.array[offset++] = delay + j * vertexDelay;
-        aDelayDuration.array[offset++] = duration;
+      const duration =
+        minDuration + Math.random() * (maxDuration - minDuration);
+
+      // Random pivot (matching original range 0-2)
+      const pivot = new THREE.Vector3(
+        Math.random() * 2,
+        Math.random() * 2,
+        Math.random() * 2,
+      );
+
+      // Random axis and angle
+      const axis = new THREE.Vector3(
+        (Math.random() - 0.5) * 2,
+        (Math.random() - 0.5) * 2,
+        (Math.random() - 0.5) * 2,
+      ).normalize();
+      const angle = Math.PI * (12 + Math.random() * 12);
+
+      // Copy prefab vertices
+      for (let j = 0; j < verticesPerPrefab; j++) {
+        const vertexIndex = i * verticesPerPrefab + j;
+
+        // Copy positions
+        positions[vertexIndex * 3] = prefabPositions.getX(j);
+        positions[vertexIndex * 3 + 1] = prefabPositions.getY(j);
+        positions[vertexIndex * 3 + 2] = prefabPositions.getZ(j);
+
+        // Copy normals
+        normals[vertexIndex * 3] = prefabNormals.getX(j);
+        normals[vertexIndex * 3 + 1] = prefabNormals.getY(j);
+        normals[vertexIndex * 3 + 2] = prefabNormals.getZ(j);
+
+        // Set colors
+        colors[vertexIndex * 3] = PARTICLE_COLOR.r;
+        colors[vertexIndex * 3 + 1] = PARTICLE_COLOR.g;
+        colors[vertexIndex * 3 + 2] = PARTICLE_COLOR.b;
+
+        // Set animation attributes
+        delayDurations[vertexIndex * 2] = delay + j * vertexDelay;
+        delayDurations[vertexIndex * 2 + 1] = duration;
+
+        pivots[vertexIndex * 3] = pivot.x;
+        pivots[vertexIndex * 3 + 1] = pivot.y;
+        pivots[vertexIndex * 3 + 2] = pivot.z;
+
+        axisAngles[vertexIndex * 4] = axis.x;
+        axisAngles[vertexIndex * 4 + 1] = axis.y;
+        axisAngles[vertexIndex * 4 + 2] = axis.z;
+        axisAngles[vertexIndex * 4 + 3] = angle;
+      }
+
+      // Copy indices
+      if (prefabIndices) {
+        for (let j = 0; j < indicesPerPrefab; j++) {
+          indices[i * indicesPerPrefab + j] =
+            prefabIndices.getX(j) + i * verticesPerPrefab;
+        }
       }
     }
 
-    const pivot = new THREE.Vector3();
-    for (i = 0, offset = 0; i < particleCount; i++) {
-      pivot.x = THREE.Math.randFloat(0, 2);
-      pivot.y = THREE.Math.randFloat(0, 2);
-      pivot.z = THREE.Math.randFloat(0, 2);
-      for (j = 0; j < prefabGeometry.vertices.length; j++) {
-        aPivot.array[offset++] = pivot.x;
-        aPivot.array[offset++] = pivot.y;
-        aPivot.array[offset++] = pivot.z;
-      }
-    }
-
-    const axis = new THREE.Vector3();
-    let angle = 0;
-    for (i = 0, offset = 0; i < particleCount; i++) {
-      axis.x = THREE.Math.randFloatSpread(2);
-      axis.y = THREE.Math.randFloatSpread(2);
-      axis.z = THREE.Math.randFloatSpread(2);
-      axis.normalize();
-      angle = Math.PI * THREE.Math.randInt(12, 24);
-      for (j = 0; j < prefabGeometry.vertices.length; j++) {
-        aAxisAngle.array[offset++] = axis.x;
-        aAxisAngle.array[offset++] = axis.y;
-        aAxisAngle.array[offset++] = axis.z;
-        aAxisAngle.array[offset++] = angle;
-      }
-    }
-
-    const color = new THREE.Color(0xff0000);
-    for (i = 0, offset = 0; i < particleCount; i++) {
-      for (j = 0; j < prefabGeometry.vertices.length; j++) {
-        aColor.array[offset++] = color.r;
-        aColor.array[offset++] = color.g;
-        aColor.array[offset++] = color.b;
-      }
-    }
-
-    // Add normals attribute
-    const prefabNormals = prefabGeometry.attributes.normal.array;
-    const totalVertices = particleCount * prefabGeometry.vertices.length;
-    const normalBuffer = new Float32Array(totalVertices * 3);
-    for (i = 0, offset = 0; i < particleCount; i++) {
-      for (j = 0; j < prefabGeometry.vertices.length; j++, offset += 3) {
-        normalBuffer[offset] = prefabNormals[j * 3];
-        normalBuffer[offset + 1] = prefabNormals[j * 3 + 1];
-        normalBuffer[offset + 2] = prefabNormals[j * 3 + 2];
-      }
-    }
-    bufferGeometry.addAttribute(
-      "normal",
-      new THREE.BufferAttribute(normalBuffer, 3),
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+    geometry.setAttribute(
+      "aDelayDuration",
+      new THREE.BufferAttribute(delayDurations, 2),
     );
+    geometry.setAttribute("aPivot", new THREE.BufferAttribute(pivots, 3));
+    geometry.setAttribute(
+      "aAxisAngle",
+      new THREE.BufferAttribute(axisAngles, 4),
+    );
+    geometry.setIndex(new THREE.BufferAttribute(indices, 1));
 
-    // Material
-    const material = new THREE.BAS.PhongAnimationMaterial(
-      {
-        vertexColors: THREE.VertexColors,
-        flatShading: true,
-        side: THREE.DoubleSide,
-        defines: { PATH_LENGTH: pathLength },
-        uniforms: {
-          uTime: { value: 0 },
-          uPath: { value: pathArray },
-          uRadius: { value: radiusArray },
-          uRoundness: { value: new THREE.Vector2(2, 2) },
-          uParticleScale: { value: 1.0 },
+    // Updated vertex shader with shake support
+    const vertexShader = `
+      #define PATH_LENGTH ${pathLength}
+      
+      uniform float uTime;
+      uniform vec3 uPath[PATH_LENGTH];
+      uniform float uRadius[PATH_LENGTH];
+      uniform vec3 uShake[PATH_LENGTH];
+      uniform vec2 uRoundness;
+      uniform float uParticleScale;
+      
+      attribute vec2 aDelayDuration;
+      attribute vec3 aPivot;
+      attribute vec4 aAxisAngle;
+      
+      varying vec3 vColor;
+      varying vec3 vNormal;
+      varying vec3 vWorldPosition;
+      
+      vec3 rotateVector(vec4 q, vec3 v) {
+        return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
+      }
+      
+      vec4 quatFromAxisAngle(vec3 axis, float angle) {
+        float halfAngle = angle * 0.5;
+        return vec4(axis.xyz * sin(halfAngle), cos(halfAngle));
+      }
+      
+      float catmullRom(float p0, float p1, float p2, float p3, float t) {
+        float v0 = (p2 - p0) * 0.5;
+        float v1 = (p3 - p1) * 0.5;
+        float t2 = t * t;
+        float t3 = t * t * t;
+        return (2.0 * p1 - 2.0 * p2 + v0 + v1) * t3 + (-3.0 * p1 + 3.0 * p2 - 2.0 * v0 - v1) * t2 + v0 * t + p1;
+      }
+      
+      vec3 catmullRom(vec3 p0, vec3 p1, vec3 p2, vec3 p3, vec2 c, float t) {
+        vec3 v0 = (p2 - p0) * c.x;
+        vec3 v1 = (p3 - p1) * c.y;
+        float t2 = t * t;
+        float t3 = t * t * t;
+        return vec3((2.0 * p1 - 2.0 * p2 + v0 + v1) * t3 + (-3.0 * p1 + 3.0 * p2 - 2.0 * v0 - v1) * t2 + v0 * t + p1);
+      }
+      
+      vec3 catmullRomShake(vec3 s0, vec3 s1, vec3 s2, vec3 s3, float t) {
+        return vec3(
+          catmullRom(s0.x, s1.x, s2.x, s3.x, t),
+          catmullRom(s0.y, s1.y, s2.y, s3.y, t),
+          catmullRom(s0.z, s1.z, s2.z, s3.z, t)
+        );
+      }
+      
+      void main() {
+        vColor = color;
+        
+        float tDelay = aDelayDuration.x;
+        float tDuration = aDelayDuration.y;
+        float tTime = clamp(uTime - tDelay, 0.0, tDuration);
+        float tProgress = tTime / tDuration;
+        float angle = aAxisAngle.w * tProgress;
+        vec4 tQuat = quatFromAxisAngle(aAxisAngle.xyz, angle);
+        
+        // Transform normal
+        vec3 objectNormal = normal;
+        objectNormal = rotateVector(tQuat, objectNormal);
+        
+        // Transform position
+        vec3 transformed = position;
+        float tMax = float(PATH_LENGTH - 1);
+        float tPoint = tMax * tProgress;
+        float tIndex = floor(tPoint);
+        float tWeight = tPoint - tIndex;
+        
+        int i0 = int(max(0.0, tIndex - 1.0));
+        int i1 = int(tIndex);
+        int i2 = int(min(tIndex + 1.0, tMax));
+        int i3 = int(min(tIndex + 2.0, tMax));
+        
+        vec3 p0 = uPath[i0];
+        vec3 p1 = uPath[i1];
+        vec3 p2 = uPath[i2];
+        vec3 p3 = uPath[i3];
+        
+        // Interpolate shake
+        vec3 s0 = uShake[i0];
+        vec3 s1 = uShake[i1];
+        vec3 s2 = uShake[i2];
+        vec3 s3 = uShake[i3];
+        vec3 shake = catmullRomShake(s0, s1, s2, s3, tWeight);
+        
+        float radius = catmullRom(uRadius[i0], uRadius[i1], uRadius[i2], uRadius[i3], tWeight);
+        
+        transformed += aPivot * radius;
+        transformed = rotateVector(tQuat, transformed);
+        transformed *= uParticleScale;
+        
+        // Add base position and shake
+        vec3 basePosition = catmullRom(p0, p1, p2, p3, uRoundness, tWeight);
+        transformed += basePosition + shake;
+        
+        vec4 mvPosition = modelViewMatrix * vec4(transformed, 1.0);
+        gl_Position = projectionMatrix * mvPosition;
+        
+        vNormal = normalize(normalMatrix * objectNormal);
+        vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
+      }
+    `;
+
+    // Fragment shader (same as original)
+    const fragmentShader = `
+      uniform vec3 uEmissive;
+      uniform vec3 uLightPos1;
+      uniform vec3 uLightPos2;
+      uniform vec3 uLightPos3;
+      uniform vec3 uLightColor1;
+      uniform vec3 uLightColor2;
+      uniform vec3 uLightColor3;
+      uniform float uLightIntensity1;
+      uniform float uLightIntensity2;
+      uniform float uLightIntensity3;
+      
+      varying vec3 vColor;
+      varying vec3 vNormal;
+      varying vec3 vWorldPosition;
+      
+      void main() {
+        vec3 normal = normalize(vNormal);
+        vec3 finalColor = uEmissive * vColor;
+        
+        // Light 1 (point light)
+        vec3 lightDir1 = normalize(uLightPos1 - vWorldPosition);
+        float diff1 = max(dot(normal, lightDir1), 0.0);
+        float distance1 = length(uLightPos1 - vWorldPosition);
+        float attenuation1 = 1.0 / (1.0 + 0.001 * distance1 + 0.0001 * distance1 * distance1);
+        finalColor += vColor * uLightColor1 * diff1 * uLightIntensity1 * attenuation1;
+        
+        // Light 2 (directional)
+        vec3 lightDir2 = normalize(uLightPos2);
+        float diff2 = max(dot(normal, lightDir2), 0.0);
+        finalColor += vColor * uLightColor2 * diff2 * uLightIntensity2;
+        
+        // Light 3 (directional)
+        vec3 lightDir3 = normalize(uLightPos3);
+        float diff3 = max(dot(normal, lightDir3), 0.0);
+        finalColor += vColor * uLightColor3 * diff3 * uLightIntensity3;
+        
+        // Add ambient
+        finalColor += vColor * 0.1;
+        
+        gl_FragColor = vec4(finalColor, 1.0);
+      }
+    `;
+
+    // Create material
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uPath: { value: pathPositions },
+        uRadius: { value: radiusArray },
+        uShake: { value: shakeArray },
+        uRoundness: { value: new THREE.Vector2(2, 2) },
+        uParticleScale: { value: 1.0 },
+        uEmissive: {
+          value: new THREE.Color(
+            PARTICLE_COLOR.emissive.r,
+            PARTICLE_COLOR.emissive.g,
+            PARTICLE_COLOR.emissive.b,
+          ),
         },
-        shaderFunctions: [
-          THREE.BAS.ShaderChunk["quaternion_rotation"],
-          THREE.BAS.ShaderChunk["catmull-rom"],
-          THREE.BAS.ShaderChunk["ease_in_out_cubic"],
-        ],
-        shaderParameters: [
-          "uniform float uTime;",
-          "uniform vec3 uPath[PATH_LENGTH];",
-          "uniform float uRadius[PATH_LENGTH];",
-          "uniform vec2 uRoundness;",
-          "uniform float uParticleScale;",
-          "attribute vec2 aDelayDuration;",
-          "attribute vec3 aPivot;",
-          "attribute vec4 aAxisAngle;",
-        ],
-        shaderVertexInit: [
-          "float tDelay = aDelayDuration.x;",
-          "float tDuration = aDelayDuration.y;",
-          "float tTime = clamp(uTime - tDelay, 0.0, tDuration);",
-          "float tProgress = tTime / tDuration;",
-          "float angle = aAxisAngle.w * tProgress;",
-          "vec4 tQuat = quatFromAxisAngle(aAxisAngle.xyz, angle);",
-        ],
-        shaderTransformNormal: [
-          "objectNormal = rotateVector(tQuat, objectNormal);",
-        ],
-        shaderTransformPosition: [
-          "float tMax = float(PATH_LENGTH - 1);",
-          "float tPoint = tMax * tProgress;",
-          "float tIndex = floor(tPoint);",
-          "float tWeight = tPoint - tIndex;",
-          "int i0 = int(max(0.0, tIndex - 1.0));",
-          "int i1 = int(tIndex);",
-          "int i2 = int(min(tIndex + 1.0, tMax));",
-          "int i3 = int(min(tIndex + 2.0, tMax));",
-          "vec3 p0 = uPath[i0];",
-          "vec3 p1 = uPath[i1];",
-          "vec3 p2 = uPath[i2];",
-          "vec3 p3 = uPath[i3];",
-          "float radius = catmullRom(uRadius[i0], uRadius[i1], uRadius[i2], uRadius[i3], tWeight);",
-          "transformed += aPivot * radius;",
-          "transformed = rotateVector(tQuat, transformed);",
-          "transformed *= uParticleScale;",
-          "transformed += catmullRom(p0, p1, p2, p3, uRoundness, tWeight);",
-        ],
+        uLightPos1: { value: new THREE.Vector3(0, 0, 0) },
+        uLightPos2: { value: new THREE.Vector3(0, 1, 1) },
+        uLightPos3: { value: new THREE.Vector3(0, 1, -1) },
+        uLightColor1: {
+          value: new THREE.Color(
+            PARTICLE_COLOR.lights.color1.r,
+            PARTICLE_COLOR.lights.color1.g,
+            PARTICLE_COLOR.lights.color1.b,
+          ),
+        },
+        uLightColor2: {
+          value: new THREE.Color(
+            PARTICLE_COLOR.lights.color2.r,
+            PARTICLE_COLOR.lights.color2.g,
+            PARTICLE_COLOR.lights.color2.b,
+          ),
+        },
+        uLightColor3: {
+          value: new THREE.Color(
+            PARTICLE_COLOR.lights.color3.r,
+            PARTICLE_COLOR.lights.color3.g,
+            PARTICLE_COLOR.lights.color3.b,
+          ),
+        },
+        uLightIntensity1: { value: 0.25 },
+        uLightIntensity2: { value: 0.25 },
+        uLightIntensity3: { value: 0.25 },
       },
-      {
-        shininess: 10,
-        specular: 0x000000,
-        emissive: 0xff0000,
-      },
-    );
+      vertexShader,
+      fragmentShader,
+      vertexColors: true,
+      side: THREE.DoubleSide,
+    });
 
-    const particles = new THREE.Mesh(bufferGeometry, material);
+    const particles = new THREE.Mesh(geometry, material);
     particles.frustumCulled = false;
     scene.add(particles);
 
@@ -657,7 +708,11 @@ const AudioVisualizer: React.FC = () => {
       renderer,
       controls,
       particles,
+      pathPositions,
+      radiusArray,
+      shakeArray,
       lights: { light1, light2, light3 },
+      analyzer: undefined,
     };
 
     setDebugInfo("Ready to play");
@@ -671,19 +726,32 @@ const AudioVisualizer: React.FC = () => {
 
       if (!sceneRef.current) return;
 
-      const { camera, renderer, scene, controls, particles } = sceneRef.current;
+      const {
+        camera,
+        renderer,
+        scene,
+        controls,
+        particles,
+        radiusArray,
+        shakeArray,
+      } = sceneRef.current;
       const anim = animState.current;
 
       controls.update();
 
       // Update time
       anim.time = audioRef.current?.currentTime || 0;
-      particles.material.uniforms.uTime.value = anim.time;
+      if (particles.material && particles.material.uniforms) {
+        particles.material.uniforms.uTime.value = anim.time;
+      }
+
+      // Update shake phase for erratic movement
+      anim.shakePhase += 0.3;
 
       // Audio processing
       if (
         sceneRef.current.analyzer &&
-        isPlaying &&
+        isPlayingRef.current &&
         audioRef.current &&
         !audioRef.current.paused
       ) {
@@ -708,6 +776,15 @@ const AudioVisualizer: React.FC = () => {
         const bassCount = bassEndBin;
         const midCount = midEndBin - bassEndBin;
         const highCount = cap - midEndBin;
+
+        // Check if we're getting audio data
+        let hasAudioData = false;
+        for (let i = 0; i < data.length; i++) {
+          if (data[i] > 0) {
+            hasAudioData = true;
+            break;
+          }
+        }
 
         for (let i = 0; i < bassEndBin; i++) {
           bassTotal += data[i];
@@ -746,7 +823,7 @@ const AudioVisualizer: React.FC = () => {
           0.05 *
           highAvg;
 
-        // Complex radius calculation
+        // Complex radius calculation - THIS IS THE KEY PART
         const currentTime = audioRef.current.currentTime || 0;
         const prefabDelay = 0.00015;
         let minVisibleProgress = 1.0;
@@ -784,7 +861,14 @@ const AudioVisualizer: React.FC = () => {
         const bassThreshold = minVisibleProgress + visibleRange / 3;
         const midThreshold = minVisibleProgress + (2 * visibleRange) / 3;
 
-        // Process frequency data for all segments
+        // Clear shake array
+        for (let i = 0; i < pathLength; i++) {
+          shakeArray[i * 3] = 0;
+          shakeArray[i * 3 + 1] = 0;
+          shakeArray[i * 3 + 2] = 0;
+        }
+
+        // Process frequency data for all segments (ORIGINAL LOGIC)
         for (let pass = 0; pass < 4; pass++) {
           for (let i = 0; i < cap; i++) {
             let idx = i;
@@ -799,8 +883,11 @@ const AudioVisualizer: React.FC = () => {
 
             let weight = 1.0;
             let freqValue = 0;
+            let isInBassSection = false;
 
             if (progressAlongPath <= bassThreshold || timeInPath <= 0) {
+              // Bass section
+              isInBassSection = true;
               weight = 1.8 + bassAvg * 4.0;
               weight += (Math.random() - 0.5) * 0.3;
               if (idx < bassEndBin) {
@@ -812,6 +899,7 @@ const AudioVisualizer: React.FC = () => {
                 freqValue *= 1.3 + Math.random() * 0.4;
               }
             } else if (progressAlongPath < midThreshold) {
+              // Mid section
               weight = 1.2 + midAvg * 2.0;
               weight += (Math.random() - 0.5) * 0.2;
               if (idx >= bassEndBin && idx < midEndBin) {
@@ -820,6 +908,7 @@ const AudioVisualizer: React.FC = () => {
                 freqValue = midAvg * 255 * weight * 0.7;
               }
             } else {
+              // High section
               weight = 1.0 + highAvg * 1.5;
               weight += (Math.random() - 0.5) * 0.15;
               if (idx >= midEndBin) {
@@ -834,10 +923,44 @@ const AudioVisualizer: React.FC = () => {
             }
 
             dataArray.push(freqValue);
+
+            // Apply shake ONLY to bass section
+            if (i < pathLength && isInBassSection && bassAvg > 0.1) {
+              const pathIndex = Math.floor(
+                progressAlongPath * (pathLength - 1),
+              );
+              if (pathIndex >= 0 && pathIndex < pathLength) {
+                // Erratic shake using multiple sine waves
+                const shakeIntensity = bassAvg * BASS_CONFIG.bassShakeIntensity;
+                const shake1 = Math.sin(
+                  anim.shakePhase * 7.3 + pathIndex * 0.5,
+                );
+                const shake2 = Math.sin(
+                  anim.shakePhase * 13.7 + pathIndex * 0.7,
+                );
+                const shake3 = Math.sin(
+                  anim.shakePhase * 23.1 + pathIndex * 1.1,
+                );
+
+                shakeArray[pathIndex * 3] +=
+                  shake1 * shakeIntensity * (Math.random() - 0.5);
+                shakeArray[pathIndex * 3 + 1] +=
+                  shake2 * shakeIntensity * (Math.random() - 0.5);
+                shakeArray[pathIndex * 3 + 2] +=
+                  shake3 * shakeIntensity * (Math.random() - 0.5);
+
+                // Extra shake on bass hit
+                if (bassHit) {
+                  shakeArray[pathIndex * 3] *= 1.5;
+                  shakeArray[pathIndex * 3 + 1] *= 1.5;
+                  shakeArray[pathIndex * 3 + 2] *= 1.5;
+                }
+              }
+            }
           }
         }
 
-        // Update radius array
+        // Update radius array based on processed data
         for (let i = 0; i < dataArray.length && i < pathLength; i++) {
           if (i && dataArray.length - i > 1) {
             let val = dataArray[i] / 255;
@@ -871,23 +994,36 @@ const AudioVisualizer: React.FC = () => {
         }
 
         // Update material uniforms
-        const r =
-          BASS_CONFIG.roundnessMultiplier * Math.pow(bassAvg, 2) +
-          1 +
-          Math.sin(anim.noiseOffset * 3) * 0.5;
-        particles.material.uniforms.uRoundness.value.set(r, r);
+        if (particles.material && particles.material.uniforms) {
+          // Roundness
+          const r = BASS_CONFIG.roundnessMultiplier * Math.pow(bassAvg, 2) + 1;
+          particles.material.uniforms.uRoundness.value.set(
+            r + Math.sin(anim.noiseOffset * 3) * 0.5,
+            r + Math.sin(anim.noiseOffset * 3) * 0.5,
+          );
 
-        const bassParticleScale =
-          1.0 + bassAvg * (BASS_CONFIG.particleScaleMax - 1.0) * 1.5;
-        const overallEnergy = bassAvg * 0.5 + midAvg * 0.3 + highAvg * 0.2;
-        let particleScale =
-          1.0 + overallEnergy * (BASS_CONFIG.particleScaleMax - 1.0);
-        particleScale = Math.max(particleScale, bassParticleScale);
-        particleScale +=
-          Math.sin(anim.noiseOffset * 5 + anim.randomSeed) * 0.05;
+          // Particle scale
+          const bassParticleScale =
+            1.0 + bassAvg * (BASS_CONFIG.particleScaleMax - 1.0) * 1.5;
+          const overallEnergy = bassAvg * 0.5 + midAvg * 0.3 + highAvg * 0.2;
+          let particleScale =
+            1.0 + overallEnergy * (BASS_CONFIG.particleScaleMax - 1.0);
+          particleScale = Math.max(particleScale, bassParticleScale);
+          particleScale +=
+            Math.sin(anim.noiseOffset * 5 + anim.randomSeed) * 0.05;
 
-        particles.material.uniforms.uParticleScale.value = particleScale;
-        particles.material.uniforms.uRadius.needsUpdate = true;
+          particles.material.uniforms.uParticleScale.value = particleScale;
+          particles.material.uniforms.uRadius.needsUpdate = true;
+          particles.material.uniforms.uShake.needsUpdate = true;
+        }
+
+        // Force update uniforms
+        if (particles.material && particles.material.uniforms) {
+          particles.material.uniforms.uRadius.value = radiusArray;
+          particles.material.uniforms.uShake.value = shakeArray;
+          particles.material.uniforms.uRadius.needsUpdate = true;
+          particles.material.uniforms.uShake.needsUpdate = true;
+        }
 
         // Update lights
         const { lights } = sceneRef.current;
@@ -902,24 +1038,76 @@ const AudioVisualizer: React.FC = () => {
         lights.light3.intensity =
           Math.pow(lightIntensity, 3) * 0.5 * (0.9 + Math.random() * 0.1);
 
-        // Color shift
-        if (BASS_CONFIG.enableColorShift && bassAvg > 0.5) {
-          const hueShift = Math.sin(anim.noiseOffset * 2) * 0.05;
-          lights.light1.color.setHSL(0.0 + hueShift, 1.0, 0.5 + bassAvg * 0.5);
-          lights.light2.color.setHSL(
-            0.1 + hueShift * 0.5,
-            0.8,
-            0.5 + bassAvg * 0.3,
-          );
-          lights.light3.color.setHSL(
-            0.05 + hueShift * 0.7,
-            0.9,
-            0.5 + bassAvg * 0.4,
-          );
-        } else {
-          lights.light1.color.setHex(0xff0000);
-          lights.light2.color.setHex(0xff0000);
-          lights.light3.color.setHex(0x000000); // Matching vanilla, even if potentially a typo
+        // Update material light uniforms
+        if (particles.material && particles.material.uniforms) {
+          particles.material.uniforms.uLightIntensity1.value =
+            lights.light1.intensity;
+          particles.material.uniforms.uLightIntensity2.value =
+            lights.light2.intensity;
+          particles.material.uniforms.uLightIntensity3.value =
+            lights.light3.intensity;
+
+          // Color shift
+          if (BASS_CONFIG.enableColorShift && bassAvg > 0.5) {
+            const hueShift = Math.sin(anim.noiseOffset * 2) * 0.05;
+            lights.light1.color.setHSL(
+              0.0 + hueShift,
+              1.0,
+              0.5 + bassAvg * 0.5,
+            );
+            lights.light2.color.setHSL(
+              0.1 + hueShift * 0.5,
+              0.8,
+              0.5 + bassAvg * 0.3,
+            );
+            lights.light3.color.setHSL(
+              0.05 + hueShift * 0.7,
+              0.9,
+              0.5 + bassAvg * 0.4,
+            );
+
+            particles.material.uniforms.uLightColor1.value.copy(
+              lights.light1.color,
+            );
+            particles.material.uniforms.uLightColor2.value.copy(
+              lights.light2.color,
+            );
+            particles.material.uniforms.uLightColor3.value.copy(
+              lights.light3.color,
+            );
+          } else {
+            lights.light1.color.setRGB(
+              PARTICLE_COLOR.lights.color1.r,
+              PARTICLE_COLOR.lights.color1.g,
+              PARTICLE_COLOR.lights.color1.b,
+            );
+            lights.light2.color.setRGB(
+              PARTICLE_COLOR.lights.color2.r,
+              PARTICLE_COLOR.lights.color2.g,
+              PARTICLE_COLOR.lights.color2.b,
+            );
+            lights.light3.color.setRGB(
+              PARTICLE_COLOR.lights.color3.r,
+              PARTICLE_COLOR.lights.color3.g,
+              PARTICLE_COLOR.lights.color3.b,
+            );
+
+            particles.material.uniforms.uLightColor1.value.set(
+              PARTICLE_COLOR.lights.color1.r,
+              PARTICLE_COLOR.lights.color1.g,
+              PARTICLE_COLOR.lights.color1.b,
+            );
+            particles.material.uniforms.uLightColor2.value.set(
+              PARTICLE_COLOR.lights.color2.r,
+              PARTICLE_COLOR.lights.color2.g,
+              PARTICLE_COLOR.lights.color2.b,
+            );
+            particles.material.uniforms.uLightColor3.value.set(
+              PARTICLE_COLOR.lights.color3.r,
+              PARTICLE_COLOR.lights.color3.g,
+              PARTICLE_COLOR.lights.color3.b,
+            );
+          }
         }
 
         // Update rotation speed
@@ -932,13 +1120,16 @@ const AudioVisualizer: React.FC = () => {
 
         if (frameCount % 30 === 0) {
           setDebugInfo(
-            `Bass: ${(bassAvg * 100).toFixed(0)}% | Mid: ${(midAvg * 100).toFixed(0)}% | High: ${(highAvg * 100).toFixed(0)}%`,
+            `Bass: ${(bassAvg * 100).toFixed(0)}% | Mid: ${(midAvg * 100).toFixed(0)}% | High: ${(highAvg * 100).toFixed(0)}% | Data: ${hasAudioData ? "Yes" : "No"}`,
           );
         }
       } else {
         // Default animation when not playing
         for (let i = 0; i < pathLength; i++) {
-          radiusArray[i] = 128;
+          radiusArray[i] = 0;
+          shakeArray[i * 3] = 0;
+          shakeArray[i * 3 + 1] = 0;
+          shakeArray[i * 3 + 2] = 0;
         }
       }
 
@@ -975,29 +1166,52 @@ const AudioVisualizer: React.FC = () => {
   }, []);
 
   const handlePlay = async () => {
-    if (!audioRef.current || !sceneRef.current) return;
+    console.log("handlePlay called");
+    if (!audioRef.current || !sceneRef.current) {
+      console.log("Missing refs:", {
+        audio: !!audioRef.current,
+        scene: !!sceneRef.current,
+      });
+      return;
+    }
 
     setDebugInfo("Initializing audio...");
 
     try {
       if (!sceneRef.current.analyzer) {
+        console.log("Creating analyzer...");
         sceneRef.current.analyzer = new AudioAnalyzer(pathLength * 4, 0.85);
       }
 
+      console.log("Initializing analyzer...");
       const success = await sceneRef.current.analyzer.init(audioRef.current);
       if (!success) {
         setDebugInfo("Failed to initialize audio");
         return;
       }
 
+      // Ensure audio context is resumed
+      if (sceneRef.current.analyzer.context.state === "suspended") {
+        await sceneRef.current.analyzer.context.resume();
+        console.log("Audio context resumed");
+      }
+
       audioRef.current.currentTime = 0;
+      console.log("About to play audio...");
       await audioRef.current.play();
+      console.log("Audio play() called successfully");
+
       setIsPlaying(true);
+      isPlayingRef.current = true;
       setShowPlayButton(false);
       setDebugInfo("Playing...");
+      console.log("State updated: isPlaying = true, analyzer connected");
 
       if (sceneRef.current) {
+        // Set camera far away initially like original
         sceneRef.current.camera.position.set(0, 0, 10000);
+        sceneRef.current.controls.distance = 10000;
+        sceneRef.current.controls.targetDistance = 1000;
       }
     } catch (error) {
       console.error("Error playing audio:", error);
@@ -1012,9 +1226,10 @@ const AudioVisualizer: React.FC = () => {
       <audio
         ref={audioRef}
         crossOrigin="anonymous"
-        src="https://audio.jukehost.co.uk/TDrkUvipGApgKgYZ7ovXBv42i4EHUAMD"
+        src={"https://audio.jukehost.co.uk/ITSU2gQK1IVmDorLaKd9gU2fRk6RqzdJ"}
         onEnded={() => {
           setIsPlaying(false);
+          isPlayingRef.current = false;
           setShowPlayButton(true);
           setDebugInfo("Ready to play");
         }}
@@ -1027,7 +1242,7 @@ const AudioVisualizer: React.FC = () => {
               onClick={handlePlay}
               className="mb-4 rounded-lg bg-red-600 px-8 py-4 text-xl font-bold text-white shadow-lg transition-colors duration-200 hover:bg-red-700"
             >
-              Play 77,777 Particles
+              Play 100,000 Particles
             </button>
             <p className="text-sm text-white">
               Particles will flow along a path and react to music
