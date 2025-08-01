@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { hush_borne, immortal_eprom, stephanie_danielallen, weightless_wink } from "../../assets/mp3s";
+import { hush_borne, immortal_eprom, stephanie_danielallen, thecorruption_eprom, thejudgment_eprom, weightless_wink } from "../../assets/mp3s";
 const aud =  hush_borne;
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -23,21 +23,21 @@ const PARTICLE_COLOR = {
 const BASS_CONFIG = {
   subBassIntensity: 0.4,
   lowBassIntensity: 0.5,
-  lowMidIntensity: 0.9,
-  highMidIntensity: 0.8,
-  highIntensity: 0.8,
-  radiusMultiplier: 12,
-  radiusPower: 8,
+  lowMidIntensity: 0.8,
+  highMidIntensity: 0.7,
+  highIntensity: 0.6,
+  radiusMultiplier: 13,
+  radiusPower: 10,
   particleScaleMax: 2,
-  roundnessMultiplier: 10,
+  roundnessMultiplier: 20,
   lightIntensityMultiplier: 6,
   rotationSpeedMax: 25,
   enableColorShift: true,
   subBassShakeIntensity: 6,
   subBassRotationIntensity: 100,
-  subBassThreshold: 0.4,
-	subBassDecay: 0.1,
-	subBassAttack: 1
+  subBassThreshold: 0.0,
+	subBassDecay: 0.05,
+	subBassAttack: 2
 };
 
 // Camera Controller
