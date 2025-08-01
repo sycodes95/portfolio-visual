@@ -7,6 +7,10 @@ export { default as unfaith_ekali } from "./Unfaith - Ekali - SoundLoadMate.com.
 export { default as weightless_wink } from "./weightless - WINK - SoundLoadMate.com.mp3";
 export { default as holdmedown_borne } from "./hold me down - borne.mp3";
 export { default as geyron_eprom } from "./Geryon - Shades - SoundLoadMate.com.mp3";
+export { default as levels_loj } from "./levels w_ L_o_J - DILIP_ L_o_J - SoundLoadMate.com.mp3";
+export { default as bluelights_ramzoid } from "./Blue Lights - Ramzoid - SoundLoadMate.com.mp3";
+export { default as power_loj } from "./L_o_J x DAGGZ - POWER _FUXWITHIT Premiere_ - L_o_J - SoundLoadMate.com.mp3";
+export { default as wrath_tsuruda } from "./Wraith - Tsuruda - SoundLoadMate.com.mp3";
 
 export const immortal_eprom =
   "https://audio.jukehost.co.uk/Yszr2ZqGhoNJNAGTEPFQGB5AtMXCSwjw";
@@ -14,7 +18,6 @@ export const thecorruption_eprom =
   "https://audio.jukehost.co.uk/TDrkUvipGApgKgYZ7ovXBv42i4EHUAMD";
 export const thejudgment_eprom =
   "https://audio.jukehost.co.uk/4muD75tIMG9HEUpUMttlRlJXCzAmWMwf";
-
 export const phonemegothik_eprom =
   "https://audio.jukehost.co.uk/ITSU2gQK1IVmDorLaKd9gU2fRk6RqzdJ";
 export const stephanie_danielallen =

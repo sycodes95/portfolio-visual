@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { hush_borne, immortal_eprom, stephanie_danielallen, thecorruption_eprom, thejudgment_eprom, weightless_wink } from "../../assets/mp3s";
-const aud =  hush_borne;
+import { hush_borne } from "../../assets/mp3s";
+const aud = hush_borne;
 // Particle color configuration
 const PARTICLE_COLOR = {
   r: 1.0, // Red
@@ -21,23 +21,23 @@ const PARTICLE_COLOR = {
 
 // Bass configuration
 const BASS_CONFIG = {
-  subBassIntensity: 0.4,
-  lowBassIntensity: 0.5,
-  lowMidIntensity: 0.8,
-  highMidIntensity: 0.7,
-  highIntensity: 0.6,
-  radiusMultiplier: 13,
-  radiusPower: 10,
+  subBassIntensity: 0.37,
+  lowBassIntensity: 0.44,
+  lowMidIntensity: 0.7,
+  highMidIntensity: 0.8,
+  highIntensity: 0.7,
+  radiusMultiplier: 15,
+  radiusPower: 12,
   particleScaleMax: 2,
-  roundnessMultiplier: 20,
+  roundnessMultiplier: 14,
   lightIntensityMultiplier: 6,
-  rotationSpeedMax: 25,
+  rotationSpeedMax: 40,
   enableColorShift: true,
-  subBassShakeIntensity: 6,
-  subBassRotationIntensity: 100,
+  subBassShakeIntensity: 5,
+  subBassRotationIntensity: 10,
   subBassThreshold: 0.0,
-	subBassDecay: 0.05,
-	subBassAttack: 2
+  subBassDecay: 0.05,
+  subBassAttack: 2,
 };
 
 // Camera Controller
@@ -57,6 +57,7 @@ class CameraController {
   maxDistance = 1500;
   minPolarAngle = Math.PI * 0.4;
   maxPolarAngle = Math.PI * 0.6;
+  lastTime = performance.now();
 
   constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement) {
     this.camera = camera;
@@ -101,10 +102,18 @@ class CameraController {
   }
 
   update() {
+    const currentTime = performance.now();
+    const deltaTime = (currentTime - this.lastTime) / 1000; // Convert to seconds
+    this.lastTime = currentTime;
+
     if (this.autoRotate && !this.isDragging) {
-      this.rotationY += this.autoRotateSpeed * 0.005;
+      // Now rotation speed is consistent regardless of frame rate
+      // Adjust the multiplier (0.3) to control rotation speed
+      this.rotationY += this.autoRotateSpeed * deltaTime * 0.3;
     }
+
     this.distance += (this.targetDistance - this.distance) * 0.05;
+
     this.camera.position.x = Math.sin(this.rotationY) * this.distance;
     this.camera.position.z = Math.cos(this.rotationY) * this.distance;
     this.camera.position.y = 0;
@@ -113,10 +122,19 @@ class CameraController {
 
   dispose() {
     this.domElement.removeEventListener("wheel", this.onWheel.bind(this));
-    this.domElement.removeEventListener("mousedown", this.onMouseDown.bind(this));
-    this.domElement.removeEventListener("mousemove", this.onMouseMove.bind(this));
+    this.domElement.removeEventListener(
+      "mousedown",
+      this.onMouseDown.bind(this),
+    );
+    this.domElement.removeEventListener(
+      "mousemove",
+      this.onMouseMove.bind(this),
+    );
     this.domElement.removeEventListener("mouseup", this.onMouseUp.bind(this));
-    this.domElement.removeEventListener("mouseleave", this.onMouseUp.bind(this));
+    this.domElement.removeEventListener(
+      "mouseleave",
+      this.onMouseUp.bind(this),
+    );
   }
 }
 
@@ -137,7 +155,8 @@ class AudioAnalyzer {
   isConnected = false;
 
   constructor(binCount: number = 1024, smoothingTimeConstant: number = 0.85) {
-    this.context = new (window.AudioContext || (window as any).webkitAudioContext)();
+    this.context = new (window.AudioContext ||
+      (window as any).webkitAudioContext)();
     this.analyzerNode = this.context.createAnalyser();
     this.analyzerNodeLeft = this.context.createAnalyser();
     this.analyzerNodeRight = this.context.createAnalyser();
@@ -283,12 +302,15 @@ const AudioVisualizer: React.FC = () => {
     rotationPhase: 0,
     subBassPeak: 0,
     subBassPeakTime: 0,
+    lastFrameTime: performance.now(),
   });
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    console.log("Initializing 77,777 particle system with 5 frequency sections...");
+    console.log(
+      "Initializing 77,777 particle system with 5 frequency sections...",
+    );
 
     // Scene setup
     const scene = new THREE.Scene();
@@ -395,7 +417,8 @@ const AudioVisualizer: React.FC = () => {
 
     for (let i = 0; i < particleCount; i++) {
       const delay = i * prefabDelay;
-      const duration = minDuration + Math.random() * (maxDuration - minDuration);
+      const duration =
+        minDuration + Math.random() * (maxDuration - minDuration);
       const pivot = new THREE.Vector3(
         Math.random() * 2,
         Math.random() * 2,
@@ -441,9 +464,15 @@ const AudioVisualizer: React.FC = () => {
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
-    geometry.setAttribute("aDelayDuration", new THREE.BufferAttribute(delayDurations, 2));
+    geometry.setAttribute(
+      "aDelayDuration",
+      new THREE.BufferAttribute(delayDurations, 2),
+    );
     geometry.setAttribute("aPivot", new THREE.BufferAttribute(pivots, 3));
-    geometry.setAttribute("aAxisAngle", new THREE.BufferAttribute(axisAngles, 4));
+    geometry.setAttribute(
+      "aAxisAngle",
+      new THREE.BufferAttribute(axisAngles, 4),
+    );
     geometry.setIndex(new THREE.BufferAttribute(indices, 1));
 
     // Vertex shader
@@ -687,7 +716,11 @@ const AudioVisualizer: React.FC = () => {
     let frameCount = 0;
     const animate = () => {
       frameId.current = requestAnimationFrame(animate);
-      frameCount++;
+      // frameCount++;
+
+      const currentTime = performance.now();
+      const deltaTime = (currentTime - animState.current.lastFrameTime) / 1000;
+      animState.current.lastFrameTime = currentTime;
 
       if (!sceneRef.current) return;
 
@@ -711,8 +744,9 @@ const AudioVisualizer: React.FC = () => {
         particles.material.uniforms.uTime.value = anim.time;
       }
 
-      anim.shakePhase += 0.3;
-      anim.rotationPhase += 0.02;
+      anim.shakePhase += 0.3 * deltaTime * 60; // Normalized to 60fps
+      anim.rotationPhase += 0.02 * deltaTime * 60;
+      anim.noiseOffset += 0.01 * deltaTime * 60;
 
       // Audio processing
       if (
@@ -762,7 +796,8 @@ const AudioVisualizer: React.FC = () => {
           subBassRight += dataRight[i];
         }
         let subBassAvg =
-          (subBassTotal / Math.max(1, subBassEnd) / 255) * BASS_CONFIG.subBassIntensity;
+          (subBassTotal / Math.max(1, subBassEnd) / 255) *
+          BASS_CONFIG.subBassIntensity;
         let subBassLeftAvg = subBassLeft / Math.max(1, subBassEnd) / 255;
         let subBassRightAvg = subBassRight / Math.max(1, subBassEnd) / 255;
 
@@ -811,7 +846,8 @@ const AudioVisualizer: React.FC = () => {
           highRight += dataRight[i];
         }
         let highAvg =
-          (highTotal / Math.max(1, cap - highMidEnd) / 255) * BASS_CONFIG.highIntensity;
+          (highTotal / Math.max(1, cap - highMidEnd) / 255) *
+          BASS_CONFIG.highIntensity;
         let highLeftAvg = highLeft / Math.max(1, cap - highMidEnd) / 255;
         let highRightAvg = highRight / Math.max(1, cap - highMidEnd) / 255;
 
@@ -835,38 +871,50 @@ const AudioVisualizer: React.FC = () => {
         const now = Date.now();
         let isBassHit = false;
 
-        if (
-          subBassAvg > BASS_CONFIG.subBassThreshold &&
-          subBassAvg > anim.previousBassAvg * 1.2 &&
-          (now - subBassPeakTime > 50)
-        ) {
-          isBassHit = true;
+        // DO SOMETHING IF BASS HIT
+        // if (
+        //   subBassAvg > BASS_CONFIG.subBassThreshold &&
+        //   subBassAvg > anim.previousBassAvg * 1.2 &&
+        //   now - subBassPeakTime > 50
+        // ) {
+        //   isBassHit = true;
 
-					console.log("BASS HIT")
-          animState.current.subBassPeak = subBassAvg * BASS_CONFIG.subBassAttack;
-          animState.current.subBassPeakTime = now;
-          anim.bassHitTime = now;
-        } else {
-          animState.current.subBassPeak *= BASS_CONFIG.subBassDecay;
-          if (animState.current.subBassPeak < 0.03) {
-            animState.current.subBassPeak = 0;
-          }
-        }
+        //   console.log("BASS HIT");
+        //   animState.current.subBassPeak =
+        //     subBassAvg * BASS_CONFIG.subBassAttack;
+        //   animState.current.subBassPeakTime = now;
+        //   anim.bassHitTime = now;
+        // } else {
+        //   animState.current.subBassPeak *= BASS_CONFIG.subBassDecay;
+        //   if (animState.current.subBassPeak < 0.03) {
+        //     animState.current.subBassPeak = 0;
+        //   }
+        // }
 
         anim.previousBassAvg = subBassAvg;
         subBassAvg = Math.max(subBassAvg, animState.current.subBassPeak);
 
         // Add noise to frequency averages
         subBassAvg +=
-          Math.sin(anim.noiseOffset * 2.3 + anim.randomSeed) * 0.05 * subBassAvg;
+          Math.sin(anim.noiseOffset * 2.3 + anim.randomSeed) *
+          0.05 *
+          subBassAvg;
         lowBassAvg +=
-          Math.sin(anim.noiseOffset * 1.9 + anim.randomSeed * 1.1) * 0.05 * lowBassAvg;
+          Math.sin(anim.noiseOffset * 1.9 + anim.randomSeed * 1.1) *
+          0.05 *
+          lowBassAvg;
         lowMidAvg +=
-          Math.sin(anim.noiseOffset * 1.7 + anim.randomSeed * 2) * 0.05 * lowMidAvg;
+          Math.sin(anim.noiseOffset * 1.7 + anim.randomSeed * 2) *
+          0.05 *
+          lowMidAvg;
         highMidAvg +=
-          Math.sin(anim.noiseOffset * 2.1 + anim.randomSeed * 2.5) * 0.05 * highMidAvg;
+          Math.sin(anim.noiseOffset * 2.1 + anim.randomSeed * 2.5) *
+          0.05 *
+          highMidAvg;
         highAvg +=
-          Math.sin(anim.noiseOffset * 3.1 + anim.randomSeed * 3) * 0.05 * highAvg;
+          Math.sin(anim.noiseOffset * 3.1 + anim.randomSeed * 3) *
+          0.05 *
+          highAvg;
 
         // Update camera rotation speed based on sub-bass (from previous code)
         let rotSpeed = 2.0 + subBassAvg * BASS_CONFIG.rotationSpeedMax;
@@ -892,8 +940,14 @@ const AudioVisualizer: React.FC = () => {
             Math.max(0.0, timeInPath / avgDuration),
           );
           if (timeInPath > 0 && timeInPath < avgDuration) {
-            minVisibleProgress = Math.min(minVisibleProgress, progressAlongPath);
-            maxVisibleProgress = Math.max(maxVisibleProgress, progressAlongPath);
+            minVisibleProgress = Math.min(
+              minVisibleProgress,
+              progressAlongPath,
+            );
+            maxVisibleProgress = Math.max(
+              maxVisibleProgress,
+              progressAlongPath,
+            );
           }
         }
 
@@ -925,7 +979,9 @@ const AudioVisualizer: React.FC = () => {
           for (let i = 0; i < pathLength; i++) {
             const rotationBase = Math.sin(anim.rotationPhase + i * 0.1);
             const rotationIntensity =
-              (subBassAvg * 1.5 + subBassPeak * 3.0) * BASS_CONFIG.subBassRotationIntensity * peakFactor;
+              (subBassAvg * 1.5 + subBassPeak * 3.0) *
+              BASS_CONFIG.subBassRotationIntensity *
+              peakFactor;
             rotationArray[i] = rotationBase * rotationIntensity;
             if (isBassHit) {
               rotationArray[i] *= 3.0;
@@ -1007,17 +1063,29 @@ const AudioVisualizer: React.FC = () => {
             dataArray.push(freqValue);
 
             if (i < pathLength) {
-              const pathIndex = Math.floor(progressAlongPath * (pathLength - 1));
+              const pathIndex = Math.floor(
+                progressAlongPath * (pathLength - 1),
+              );
               if (pathIndex >= 0 && pathIndex < pathLength) {
                 if (isInSubBassSection && subBassAvg > 0.03) {
-                  const shakeIntensity = subBassAvg * BASS_CONFIG.subBassShakeIntensity;
-                  const shake1 = Math.sin(anim.shakePhase * 7.3 + pathIndex * 0.5);
-                  const shake2 = Math.sin(anim.shakePhase * 13.7 + pathIndex * 0.7);
-                  const shake3 = Math.sin(anim.shakePhase * 23.1 + pathIndex * 1.1);
+                  const shakeIntensity =
+                    subBassAvg * BASS_CONFIG.subBassShakeIntensity;
+                  const shake1 = Math.sin(
+                    anim.shakePhase * 7.3 + pathIndex * 0.5,
+                  );
+                  const shake2 = Math.sin(
+                    anim.shakePhase * 13.7 + pathIndex * 0.7,
+                  );
+                  const shake3 = Math.sin(
+                    anim.shakePhase * 23.1 + pathIndex * 1.1,
+                  );
 
-                  shakeArray[pathIndex * 3] += shake1 * shakeIntensity * (Math.random() - 0.5);
-                  shakeArray[pathIndex * 3 + 1] += shake2 * shakeIntensity * (Math.random() - 0.5);
-                  shakeArray[pathIndex * 3 + 2] += shake3 * shakeIntensity * (Math.random() - 0.5);
+                  shakeArray[pathIndex * 3] +=
+                    shake1 * shakeIntensity * (Math.random() - 0.5);
+                  shakeArray[pathIndex * 3 + 1] +=
+                    shake2 * shakeIntensity * (Math.random() - 0.5);
+                  shakeArray[pathIndex * 3 + 2] +=
+                    shake3 * shakeIntensity * (Math.random() - 0.5);
                   panArray[pathIndex] = subBassPan * subBassAvg;
 
                   if (isBassHit) {
@@ -1046,7 +1114,8 @@ const AudioVisualizer: React.FC = () => {
             val += Math.sin(anim.noiseOffset * 4 + i * 0.2) * 0.02;
             val = Math.max(0, Math.min(1, val));
             let baseRadius =
-              Math.pow(val, BASS_CONFIG.radiusPower) * BASS_CONFIG.radiusMultiplier;
+              Math.pow(val, BASS_CONFIG.radiusPower) *
+              BASS_CONFIG.radiusMultiplier;
             baseRadius += (Math.random() - 0.5) * 2;
             const pathProgress = i / (pathLength - 1);
             if (pathProgress <= 0.2) {
@@ -1071,7 +1140,8 @@ const AudioVisualizer: React.FC = () => {
               sectionAvg = highAvg;
             }
             let baseRadius =
-              Math.pow(sectionAvg, BASS_CONFIG.radiusPower) * BASS_CONFIG.radiusMultiplier;
+              Math.pow(sectionAvg, BASS_CONFIG.radiusPower) *
+              BASS_CONFIG.radiusMultiplier;
             baseRadius += (Math.random() - 0.5) * 2;
             radiusArray[i] = Math.max(10, baseRadius);
           }
@@ -1079,17 +1149,25 @@ const AudioVisualizer: React.FC = () => {
 
         // Update material uniforms
         if (particles.material && particles.material.uniforms) {
-          const r = BASS_CONFIG.roundnessMultiplier * Math.pow(subBassAvg, 2) + 1;
+          const r =
+            BASS_CONFIG.roundnessMultiplier * Math.pow(subBassAvg, 2) + 1;
           particles.material.uniforms.uRoundness.value.set(
             r + Math.sin(anim.noiseOffset * 3) * 0.5,
             r + Math.sin(anim.noiseOffset * 3) * 0.5,
           );
-          const bassParticleScale = 1.0 + subBassAvg * (BASS_CONFIG.particleScaleMax - 1.0) * 1.5;
+          const bassParticleScale =
+            1.0 + subBassAvg * (BASS_CONFIG.particleScaleMax - 1.0) * 1.5;
           const overallEnergy =
-            subBassAvg * 0.3 + lowBassAvg * 0.2 + lowMidAvg * 0.2 + highMidAvg * 0.15 + highAvg * 0.15;
-          let particleScale = 1.0 + overallEnergy * (BASS_CONFIG.particleScaleMax - 1.0);
+            subBassAvg * 0.3 +
+            lowBassAvg * 0.2 +
+            lowMidAvg * 0.2 +
+            highMidAvg * 0.15 +
+            highAvg * 0.15;
+          let particleScale =
+            1.0 + overallEnergy * (BASS_CONFIG.particleScaleMax - 1.0);
           particleScale = Math.max(particleScale, bassParticleScale);
-          particleScale += Math.sin(anim.noiseOffset * 5 + anim.randomSeed) * 0.05;
+          particleScale +=
+            Math.sin(anim.noiseOffset * 5 + anim.randomSeed) * 0.05;
           particles.material.uniforms.uParticleScale.value = particleScale;
           particles.material.uniforms.uRadius.value = radiusArray;
           particles.material.uniforms.uShake.value = shakeArray;
@@ -1103,25 +1181,51 @@ const AudioVisualizer: React.FC = () => {
 
         // Update lights
         const { lights } = sceneRef.current;
-        const lightIntensity = subBassAvg * BASS_CONFIG.lightIntensityMultiplier;
-        const flicker = isBassHit ? 0.8 + Math.random() * 0.4 : 0.9 + Math.random() * 0.1;
+        const lightIntensity =
+          subBassAvg * BASS_CONFIG.lightIntensityMultiplier;
+        const flicker = isBassHit
+          ? 0.8 + Math.random() * 0.4
+          : 0.9 + Math.random() * 0.1;
         lights.light1.intensity = Math.pow(lightIntensity, 2) * flicker;
-        lights.light2.intensity = Math.pow(lightIntensity, 3) * 0.5 * (0.9 + Math.random() * 0.1);
-        lights.light3.intensity = Math.pow(lightIntensity, 3) * 0.5 * (0.9 + Math.random() * 0.1);
+        lights.light2.intensity =
+          Math.pow(lightIntensity, 3) * 0.5 * (0.9 + Math.random() * 0.1);
+        lights.light3.intensity =
+          Math.pow(lightIntensity, 3) * 0.5 * (0.9 + Math.random() * 0.1);
 
         if (particles.material && particles.material.uniforms) {
-          particles.material.uniforms.uLightIntensity1.value = lights.light1.intensity;
-          particles.material.uniforms.uLightIntensity2.value = lights.light2.intensity;
-          particles.material.uniforms.uLightIntensity3.value = lights.light3.intensity;
+          particles.material.uniforms.uLightIntensity1.value =
+            lights.light1.intensity;
+          particles.material.uniforms.uLightIntensity2.value =
+            lights.light2.intensity;
+          particles.material.uniforms.uLightIntensity3.value =
+            lights.light3.intensity;
 
           if (BASS_CONFIG.enableColorShift && subBassAvg > 0.5) {
             const hueShift = Math.sin(anim.noiseOffset * 2) * 0.05;
-            lights.light1.color.setHSL(0.0 + hueShift, 1.0, 0.5 + subBassAvg * 0.5);
-            lights.light2.color.setHSL(0.1 + hueShift * 0.5, 0.8, 0.5 + subBassAvg * 0.3);
-            lights.light3.color.setHSL(0.05 + hueShift * 0.7, 0.9, 0.5 + subBassAvg * 0.4);
-            particles.material.uniforms.uLightColor1.value.copy(lights.light1.color);
-            particles.material.uniforms.uLightColor2.value.copy(lights.light2.color);
-            particles.material.uniforms.uLightColor3.value.copy(lights.light3.color);
+            lights.light1.color.setHSL(
+              0.0 + hueShift,
+              1.0,
+              0.5 + subBassAvg * 0.5,
+            );
+            lights.light2.color.setHSL(
+              0.1 + hueShift * 0.5,
+              0.8,
+              0.5 + subBassAvg * 0.3,
+            );
+            lights.light3.color.setHSL(
+              0.05 + hueShift * 0.7,
+              0.9,
+              0.5 + subBassAvg * 0.4,
+            );
+            particles.material.uniforms.uLightColor1.value.copy(
+              lights.light1.color,
+            );
+            particles.material.uniforms.uLightColor2.value.copy(
+              lights.light2.color,
+            );
+            particles.material.uniforms.uLightColor3.value.copy(
+              lights.light3.color,
+            );
           } else {
             lights.light1.color.setRGB(
               PARTICLE_COLOR.lights.color1.r,
@@ -1197,8 +1301,12 @@ const AudioVisualizer: React.FC = () => {
       if (sceneRef.current) {
         sceneRef.current.controls.dispose();
         sceneRef.current.renderer.dispose();
-        if (containerRef.current?.contains(sceneRef.current.renderer.domElement)) {
-          containerRef.current.removeChild(sceneRef.current.renderer.domElement);
+        if (
+          containerRef.current?.contains(sceneRef.current.renderer.domElement)
+        ) {
+          containerRef.current.removeChild(
+            sceneRef.current.renderer.domElement,
+          );
         }
       }
     };
@@ -1265,7 +1373,8 @@ const AudioVisualizer: React.FC = () => {
         </div>
       )}
       <div className="bg-opacity-70 absolute bottom-4 left-4 rounded bg-black p-2 text-xs text-white">
-        {debugInfo} | {particleCount.toLocaleString()} particles | Scroll to zoom
+        {debugInfo} | {particleCount.toLocaleString()} particles | Scroll to
+        zoom
       </div>
     </div>
   );
