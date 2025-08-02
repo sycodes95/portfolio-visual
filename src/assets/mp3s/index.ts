@@ -11,6 +11,9 @@ export { default as levels_loj } from "./levels w_ L_o_J - DILIP_ L_o_J - SoundL
 export { default as bluelights_ramzoid } from "./Blue Lights - Ramzoid - SoundLoadMate.com.mp3";
 export { default as power_loj } from "./L_o_J x DAGGZ - POWER _FUXWITHIT Premiere_ - L_o_J - SoundLoadMate.com.mp3";
 export { default as wrath_tsuruda } from "./Wraith - Tsuruda - SoundLoadMate.com.mp3";
+export { default as hurricane_isqa } from "./hurricane in 3d - isqa - SoundLoadMate.com (1).mp3";
+export { default as daydreams_gjones } from "./Daydreams - G Jones - SoundLoadMate.com.mp3";
+export { default as whichway_gjones } from "./Which Way - G Jones - SoundLoadMate.com.mp3";
 
 export const immortal_eprom =
   "https://audio.jukehost.co.uk/Yszr2ZqGhoNJNAGTEPFQGB5AtMXCSwjw";
