@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { purification_eprom } from "../../assets/mp3s";
-const aud = purification_eprom; // Update this path as needed
+import { areuthere_muramasa } from "../../assets/mp3s";
+const aud = areuthere_muramasa; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
