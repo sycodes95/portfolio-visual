@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { weightless_wink } from "../../assets/mp3s";
-
-const aud = weightless_wink; // Update this path as needed
+import { purification_eprom } from "../../assets/mp3s";
+const aud = purification_eprom; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -29,17 +28,33 @@ const BASS_CONFIG = {
   highMidIntensity: 0.9,
   highIntensity: 1,
   radiusMultiplier: 15,
-  radiusPower: 8,
+  radiusPower: 14,
   particleScaleMax: 2,
-  roundnessMultiplier: 22,
+  roundnessMultiplier: 17,
   lightIntensityMultiplier: 6,
-  rotationSpeedMax: 40,
+  rotationSpeedMax: 33,
   enableColorShift: true,
   subBassShakeIntensity: 10,
   subBassRotationIntensity: 0,
   subBassThreshold: 0.2,
   subBassDecay: 0.05,
   subBassAttack: 5,
+};
+
+// Chromatic Aberration Configuration
+const CHROMATIC_CONFIG = {
+  modes: {
+    SUBTLE: { max: 0.002, speed: 0.1, decay: 0.92 },
+    NORMAL: { max: 0.005, speed: 0.3, decay: 0.88 },
+    INTENSE: { max: 0.015, speed: 0.5, decay: 0.85 },
+    GLITCH: { max: 0.03, speed: 0.8, decay: 0.8 },
+  },
+  bassHitMultiplier: 3.0,
+  edgeStrength: 3,
+  distanceStrength: 2,
+  panInfluence: 0.5,
+  waveSpeed: 2.0,
+  pulseSpeed: 0.1,
 };
 
 // Simple OBJ Loader function
@@ -251,10 +266,11 @@ class AudioAnalyzer {
   }
 }
 
-const AudioVisualizer = () => {
+const AudioVisualizerWithObject = () => {
   const containerRef = useRef(null);
   const audioRef = useRef(null);
   const sceneRef = useRef(null);
+  const composerRef = useRef(null);
   const frameId = useRef();
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayButton, setShowPlayButton] = useState(true);
@@ -279,12 +295,23 @@ const AudioVisualizer = () => {
     subBassPeak: 0,
     subBassPeakTime: 0,
     lastFrameTime: performance.now(),
+    // Chromatic aberration state
+    chromaticStrength: 0,
+    chromaticTargetStrength: 0,
+    chromaticMode: "SUBTLE",
+    chromaticDirection: new THREE.Vector2(0, 0),
+    chromaticWavePhase: 0,
+    chromaticPulsePhase: 0,
+    lastBassHitTime: 0,
+    overallEnergy: 0,
   });
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    console.log("Initializing head-shaped particle system...");
+    console.log(
+      "Initializing head-shaped particle system with chromatic aberration...",
+    );
 
     // Scene setup
     const scene = new THREE.Scene();
@@ -298,11 +325,117 @@ const AudioVisualizer = () => {
     );
     camera.position.set(0, 0, 1200);
 
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    // Renderer with post-processing support
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance",
+    });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(0x000000);
     containerRef.current.appendChild(renderer.domElement);
+
+    // Create render targets for chromatic aberration
+    const renderTargetOptions = {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat,
+    };
+
+    const renderTarget = new THREE.WebGLRenderTarget(
+      window.innerWidth,
+      window.innerHeight,
+      renderTargetOptions,
+    );
+
+    // Create chromatic aberration shader
+    const chromaticAberrationShader = {
+      uniforms: {
+        tDiffuse: { value: null },
+        uChromaticStrength: { value: 0.0 },
+        uChromaticDirection: { value: new THREE.Vector2(1.0, 0.0) },
+        uScreenSize: {
+          value: new THREE.Vector2(window.innerWidth, window.innerHeight),
+        },
+        uTime: { value: 0 },
+        uWavePhase: { value: 0 },
+        uEdgeStrength: { value: CHROMATIC_CONFIG.edgeStrength },
+        uDistanceStrength: { value: CHROMATIC_CONFIG.distanceStrength },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float uChromaticStrength;
+        uniform vec2 uChromaticDirection;
+        uniform vec2 uScreenSize;
+        uniform float uTime;
+        uniform float uWavePhase;
+        uniform float uEdgeStrength;
+        uniform float uDistanceStrength;
+        
+        varying vec2 vUv;
+        
+        void main() {
+          vec2 center = vec2(0.5, 0.5);
+          vec2 toCenter = vUv - center;
+          float distFromCenter = length(toCenter);
+          
+          // Edge enhancement
+          float edgeFactor = smoothstep(0.0, 0.7, distFromCenter) * uEdgeStrength;
+          
+          // Distance-based strength
+          float distanceFactor = distFromCenter * uDistanceStrength;
+          
+          // Wave distortion for dynamic effect
+          float wave = sin(distFromCenter * 10.0 + uWavePhase) * 0.1;
+          
+          // Calculate aberration direction (influenced by audio pan and natural lens behavior)
+          vec2 aberrationDir = normalize(toCenter + uChromaticDirection * 0.5);
+          
+          // Total aberration strength
+          float totalStrength = uChromaticStrength * (1.0 + edgeFactor + distanceFactor + wave);
+          
+          // Different offsets for each channel (red leads, blue lags)
+          vec2 redOffset = aberrationDir * totalStrength * 1.2;
+          vec2 greenOffset = aberrationDir * totalStrength * 0.0; // Green stays centered
+          vec2 blueOffset = -aberrationDir * totalStrength * 0.8;
+          
+          // Add slight scale differences between channels for more realistic effect
+          float redScale = 1.0 + totalStrength * 0.01;
+          float blueScale = 1.0 - totalStrength * 0.01;
+          
+          vec2 redUv = (vUv - center) * redScale + center + redOffset;
+          vec2 greenUv = vUv + greenOffset;
+          vec2 blueUv = (vUv - center) * blueScale + center + blueOffset;
+          
+          // Sample each channel separately
+          float r = texture2D(tDiffuse, redUv).r;
+          float g = texture2D(tDiffuse, greenUv).g;
+          float b = texture2D(tDiffuse, blueUv).b;
+          
+          // Slight desaturation at high aberration for artistic effect
+          vec3 color = vec3(r, g, b);
+          float lum = dot(color, vec3(0.299, 0.587, 0.114));
+          color = mix(color, vec3(lum), totalStrength * 0.1);
+          
+          gl_FragColor = vec4(color, 1.0);
+        }
+      `,
+    };
+
+    // Create post-processing quad
+    const postQuad = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.ShaderMaterial(chromaticAberrationShader),
+    );
+    const postScene = new THREE.Scene();
+    const postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    postScene.add(postQuad);
 
     const controls = new CameraController(camera, renderer.domElement);
 
@@ -633,18 +766,18 @@ const AudioVisualizer = () => {
 
           // Get base position from the complex path
           vec3 basePosition = catmullRom(p0, p1, p2, p3, uRoundness, tWeight);
-          
+
           // Calculate head influence - stronger at the end of the path
           float headInfluence = smoothstep(0.6, 0.95, tProgress);
-          
+
           // Blend between the path position and head position
           vec3 targetHeadPos = aHeadPosition;
           basePosition = mix(basePosition, targetHeadPos, headInfluence);
-          
+
           // Reduce the radius influence as particles approach head shape
           float radiusReduction = 1.0 - headInfluence * 0.7;
           transformed *= radiusReduction;
-          
+
           transformed += basePosition + shake;
 
           vec4 mvPosition = modelViewMatrix * vec4(transformed, 1.0);
@@ -766,10 +899,18 @@ const AudioVisualizer = () => {
           panArray,
           lights: { light1, light2, light3 },
           analyzer: undefined,
+          // Post-processing references
+          renderTarget,
+          postScene,
+          postCamera,
+          postQuad,
+          chromaticShader: chromaticAberrationShader,
         };
 
         setDebugInfo("Ready to play");
-        console.log("Head-shaped particle system ready");
+        console.log(
+          "Head-shaped particle system with chromatic aberration ready",
+        );
       })
       .catch((error) => {
         console.error("Error loading OBJ:", error);
@@ -798,6 +939,11 @@ const AudioVisualizer = () => {
         shakeArray,
         rotationArray,
         panArray,
+        renderTarget,
+        postScene,
+        postCamera,
+        postQuad,
+        chromaticShader,
       } = sceneRef.current;
       const anim = animState.current;
 
@@ -811,6 +957,10 @@ const AudioVisualizer = () => {
       anim.shakePhase += 0.3 * deltaTime * 60;
       anim.rotationPhase += 0.02 * deltaTime * 60;
       anim.noiseOffset += 0.01 * deltaTime * 60;
+
+      // Update chromatic aberration wave and pulse phases
+      anim.chromaticWavePhase += CHROMATIC_CONFIG.waveSpeed * deltaTime;
+      anim.chromaticPulsePhase += CHROMATIC_CONFIG.pulseSpeed * deltaTime;
 
       // Audio processing (same as original)
       if (
@@ -936,25 +1086,87 @@ const AudioVisualizer = () => {
         let isBassHit = false;
 
         // DO SOMETHING IF BASS HIT
-        // if (
-        //   subBassAvg > BASS_CONFIG.subBassThreshold &&
-        //   subBassAvg > anim.previousBassAvg * 1.2 &&
-        //   now - subBassPeakTime > 50
-        // ) {
-        //   isBassHit = true;
-        //   animState.current.subBassPeak =
-        //     subBassAvg * BASS_CONFIG.subBassAttack;
-        //   animState.current.subBassPeakTime = now;
-        //   anim.bassHitTime = now;
-        // } else {
-        //   animState.current.subBassPeak *= BASS_CONFIG.subBassDecay;
-        //   if (animState.current.subBassPeak < 0.03) {
-        //     animState.current.subBassPeak = 0;
-        //   }
-        // }
+        if (
+          subBassAvg > BASS_CONFIG.subBassThreshold &&
+          subBassAvg > anim.previousBassAvg * 1.1 &&
+          now - subBassPeakTime > 150
+        ) {
+          isBassHit = true;
+        }
 
         anim.previousBassAvg = subBassAvg;
         subBassAvg = Math.max(subBassAvg, animState.current.subBassPeak);
+
+        // Calculate overall energy for chromatic aberration
+        const overallEnergy =
+          subBassAvg * 0.3 +
+          lowBassAvg * 0.2 +
+          lowMidAvg * 0.2 +
+          highMidAvg * 0.15 +
+          highAvg * 0.15;
+        anim.overallEnergy = overallEnergy;
+
+        // CHROMATIC ABERRATION LOGIC
+        // Determine mode based on audio analysis
+        let targetMode = "SUBTLE";
+        if (isBassHit) {
+          targetMode = "GLITCH";
+        } else if (subBassAvg > 0.9) {
+          targetMode = "GLITCH";
+        } else if (subBassAvg > 0.5) {
+          targetMode = "INTENSE";
+        } else if (overallEnergy > 0.6) {
+          targetMode = "NORMAL";
+        } else {
+          targetMode = "SUBTLE";
+        }
+        anim.chromaticMode = targetMode;
+
+        // Calculate target chromatic strength
+        const modeConfig = CHROMATIC_CONFIG.modes[targetMode];
+        let targetStrength = 0;
+
+        if (isBassHit) {
+          // Massive spike on bass hit
+          targetStrength = modeConfig.max * CHROMATIC_CONFIG.bassHitMultiplier;
+        } else {
+          // Base strength from sub-bass
+          targetStrength = subBassAvg * modeConfig.max;
+
+          // Add overall energy influence
+          targetStrength += overallEnergy * modeConfig.max * 0.3;
+
+          // Clamp to mode maximum
+          targetStrength = Math.min(targetStrength, modeConfig.max);
+        }
+
+        // Add pulse effect during calm sections
+        if (targetMode === "SUBTLE" || targetMode === "NORMAL") {
+          const pulse = Math.sin(anim.chromaticPulsePhase) * 0.5 + 0.5;
+          targetStrength += pulse * modeConfig.max * 0.2;
+        }
+
+        anim.chromaticTargetStrength = targetStrength;
+
+        // Smooth transition to target strength
+        const decayRate = isBassHit ? 0.95 : modeConfig.decay;
+        anim.chromaticStrength +=
+          (anim.chromaticTargetStrength - anim.chromaticStrength) *
+          (1 - decayRate);
+
+        // Calculate chromatic direction based on stereo field
+        const panX = subBassPan * CHROMATIC_CONFIG.panInfluence * subBassAvg;
+        const panY = (highAvg - lowBassAvg) * 0.3; // Vertical based on frequency distribution
+
+        // Add some randomness on bass hits
+        if (isBassHit) {
+          anim.chromaticDirection.x = panX + (Math.random() - 0.5) * 0.5;
+          anim.chromaticDirection.y = panY + (Math.random() - 0.5) * 0.5;
+        } else {
+          // Smooth transition
+          anim.chromaticDirection.x += (panX - anim.chromaticDirection.x) * 0.1;
+          anim.chromaticDirection.y += (panY - anim.chromaticDirection.y) * 0.1;
+        }
 
         // Add noise to frequency averages
         subBassAvg +=
@@ -1324,8 +1536,12 @@ const AudioVisualizer = () => {
         }
 
         if (frameCount % 30 === 0) {
+          const chromaticPercent = (
+            (anim.chromaticStrength / CHROMATIC_CONFIG.modes.GLITCH.max) *
+            100
+          ).toFixed(0);
           setDebugInfo(
-            `Sub: ${(subBassAvg * 100).toFixed(0)}% | Peak: ${(animState.current.subBassPeak * 100).toFixed(0)}% | Low: ${(lowBassAvg * 100).toFixed(0)}% | Mid: ${(lowMidAvg * 100).toFixed(0)}% | High: ${(highAvg * 100).toFixed(0)}%`,
+            `Sub: ${(subBassAvg * 100).toFixed(0)}% | Peak: ${(animState.current.subBassPeak * 100).toFixed(0)}% | Low: ${(lowBassAvg * 100).toFixed(0)}% | Mid: ${(lowMidAvg * 100).toFixed(0)}% | High: ${(highAvg * 100).toFixed(0)}% | Chromatic: ${chromaticPercent}% [${anim.chromaticMode}]`,
           );
         }
       } else {
@@ -1338,9 +1554,38 @@ const AudioVisualizer = () => {
           panArray[i] = 0;
         }
         controls.autoRotateSpeed = 0.1;
+
+        // Decay chromatic aberration when not playing
+        anim.chromaticStrength *= 0.95;
       }
 
-      renderer.render(scene, camera);
+      // Update chromatic aberration uniforms
+      if (chromaticShader && postQuad) {
+        chromaticShader.uniforms.uChromaticStrength.value =
+          anim.chromaticStrength;
+        chromaticShader.uniforms.uChromaticDirection.value.copy(
+          anim.chromaticDirection,
+        );
+        chromaticShader.uniforms.uTime.value = anim.time;
+        chromaticShader.uniforms.uWavePhase.value = anim.chromaticWavePhase;
+      }
+
+      // Render with post-processing
+      if (renderTarget && postScene && postCamera && postQuad) {
+        // Render scene to texture
+        renderer.setRenderTarget(renderTarget);
+        renderer.render(scene, camera);
+
+        // Apply chromatic aberration
+        renderer.setRenderTarget(null);
+        postQuad.material.uniforms.tDiffuse.value = renderTarget.texture;
+        renderer.render(postScene, postCamera);
+      } else {
+        // Fallback to normal rendering
+        renderer.render(scene, camera);
+      }
+
+      frameCount++;
     };
 
     animate();
@@ -1348,10 +1593,22 @@ const AudioVisualizer = () => {
     // Handle resize
     const handleResize = () => {
       if (!sceneRef.current) return;
-      const { camera, renderer } = sceneRef.current;
+      const { camera, renderer, renderTarget, chromaticShader } =
+        sceneRef.current;
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
+
+      if (renderTarget) {
+        renderTarget.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      if (chromaticShader) {
+        chromaticShader.uniforms.uScreenSize.value.set(
+          window.innerWidth,
+          window.innerHeight,
+        );
+      }
     };
 
     window.addEventListener("resize", handleResize);
@@ -1364,6 +1621,9 @@ const AudioVisualizer = () => {
       if (sceneRef.current) {
         sceneRef.current.controls.dispose();
         sceneRef.current.renderer.dispose();
+        if (sceneRef.current.renderTarget) {
+          sceneRef.current.renderTarget.dispose();
+        }
         if (
           containerRef.current?.contains(sceneRef.current.renderer.domElement)
         ) {
@@ -1432,6 +1692,9 @@ const AudioVisualizer = () => {
             <p className="text-sm text-white">
               77,777 particles will form a head shape and react to music
             </p>
+            <p className="mt-2 text-xs text-gray-400">
+              Now with chromatic aberration effects!
+            </p>
           </div>
         </div>
       )}
@@ -1443,74 +1706,99 @@ const AudioVisualizer = () => {
   );
 };
 
-export default AudioVisualizer;
-/* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
-/* -------------------------------------------------------------------------- */
+export default AudioVisualizerWithObject;
 
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/*                                   BACK UP                                  */
+/*                                  LAST VERS                                 */
 /* -------------------------------------------------------------------------- */
-// import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
-// import { immortal_eprom } from "../../assets/mp3s";
+/* -------------------------------------------------------------------------- */
+/*                                  LAST VERS                                 */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                  LAST VERS                                 */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                  LAST VERS                                 */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                  LAST VERS                                 */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                  LAST VERS                                 */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                  LAST VERS                                 */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                  LAST VERS                                 */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                  LAST VERS                                 */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                  LAST VERS                                 */
+/* -------------------------------------------------------------------------- */
+// import { useEffect, useRef, useState } from "react";
+// import * as THREE from "three";
+// import { weightless_wink } from "../../assets/mp3s";
+// const aud = weightless_wink; // Update this path as needed
 
-// const aud = immortal_eprom;
 // // Particle color configuration
 // const PARTICLE_COLOR = {
-//   r: 1, // Red
-//   g: 1, // Green
-//   b: 1, // Blue
+//   r: 1,
+//   g: 1,
+//   b: 1,
 //   emissive: {
 //     r: 1,
 //     g: 1,
@@ -1525,7 +1813,6 @@ export default AudioVisualizer;
 
 // // Bass configuration
 // const BASS_CONFIG = {
-//   // subBassIntensity: 0.37,
 //   subBassIntensity: 0.37,
 //   lowBassIntensity: 0.7,
 //   lowMidIntensity: 0.8,
@@ -1534,9 +1821,9 @@ export default AudioVisualizer;
 //   radiusMultiplier: 15,
 //   radiusPower: 8,
 //   particleScaleMax: 2,
-//   roundnessMultiplier: 14,
+//   roundnessMultiplier: 22,
 //   lightIntensityMultiplier: 6,
-//   rotationSpeedMax: 40,
+//   rotationSpeedMax: 33,
 //   enableColorShift: true,
 //   subBassShakeIntensity: 10,
 //   subBassRotationIntensity: 0,
@@ -1545,31 +1832,75 @@ export default AudioVisualizer;
 //   subBassAttack: 5,
 // };
 
+// // Simple OBJ Loader function
+// function loadOBJ(url) {
+//   return new Promise((resolve, reject) => {
+//     fetch(url)
+//       .then((response) => response.text())
+//       .then((text) => {
+//         const lines = text.split("\n");
+//         const vertices = [];
+//         const faces = [];
+
+//         lines.forEach((line) => {
+//           const parts = line.trim().split(/\s+/);
+//           if (parts[0] === "v") {
+//             vertices.push({
+//               x: parseFloat(parts[1]),
+//               y: parseFloat(parts[2]),
+//               z: parseFloat(parts[3]),
+//             });
+//           } else if (parts[0] === "f") {
+//             const face = [];
+//             for (let i = 1; i < parts.length; i++) {
+//               const indices = parts[i].split("/");
+//               face.push(parseInt(indices[0]) - 1);
+//             }
+//             if (face.length >= 3) {
+//               faces.push(face);
+//             }
+//           }
+//         });
+
+//         resolve({ vertices, faces });
+//       })
+//       .catch(reject);
+//   });
+// }
+
+// // Helper function for Catmull-Rom spline
+// function catmullRom(p0, p1, p2, p3, t) {
+//   const v0 = (p2 - p0) * 0.5;
+//   const v1 = (p3 - p1) * 0.5;
+//   const t2 = t * t;
+//   const t3 = t * t * t;
+//   return (
+//     (2.0 * p1 - 2.0 * p2 + v0 + v1) * t3 +
+//     (-3.0 * p1 + 3.0 * p2 - 2.0 * v0 - v1) * t2 +
+//     v0 * t +
+//     p1
+//   );
+// }
+
 // // Camera Controller
 // class CameraController {
-//   camera: THREE.PerspectiveCamera;
-//   domElement: HTMLElement;
-//   autoRotate = true;
-//   autoRotateSpeed = 0.1;
-//   rotationY = 0;
-//   targetDistance = 1200;
-//   distance = 1200;
-//   isDragging = false;
-//   previousMouseX = 0;
-//   previousMouseY = 0;
-//   spherical = new THREE.Spherical();
-//   minDistance = 50;
-//   maxDistance = 1500;
-//   minPolarAngle = Math.PI * 0.4;
-//   maxPolarAngle = Math.PI * 0.6;
-//   lastTime = performance.now();
-
-//   constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement) {
+//   constructor(camera, domElement) {
 //     this.camera = camera;
 //     this.domElement = domElement;
-//     this.distance = 1200;
-//     this.targetDistance = 1200;
+//     this.autoRotate = true;
+//     this.autoRotateSpeed = 0.1;
 //     this.rotationY = 0;
+//     this.targetDistance = 1200;
+//     this.distance = 1200;
+//     this.isDragging = false;
+//     this.previousMouseX = 0;
+//     this.previousMouseY = 0;
+//     this.spherical = new THREE.Spherical();
+//     this.minDistance = 50;
+//     this.maxDistance = 1500;
+//     this.minPolarAngle = Math.PI * 0.4;
+//     this.maxPolarAngle = Math.PI * 0.6;
+//     this.lastTime = performance.now();
 
 //     this.domElement.addEventListener("wheel", this.onWheel.bind(this));
 //     this.domElement.addEventListener("mousedown", this.onMouseDown.bind(this));
@@ -1578,7 +1909,7 @@ export default AudioVisualizer;
 //     this.domElement.addEventListener("mouseleave", this.onMouseUp.bind(this));
 //   }
 
-//   onWheel(e: WheelEvent) {
+//   onWheel(e) {
 //     e.preventDefault();
 //     this.targetDistance += e.deltaY * 0.5;
 //     this.targetDistance = Math.max(
@@ -1587,13 +1918,13 @@ export default AudioVisualizer;
 //     );
 //   }
 
-//   onMouseDown(e: MouseEvent) {
+//   onMouseDown(e) {
 //     this.isDragging = true;
 //     this.previousMouseX = e.clientX;
 //     this.previousMouseY = e.clientY;
 //   }
 
-//   onMouseMove(e: MouseEvent) {
+//   onMouseMove(e) {
 //     if (!this.isDragging) return;
 //     const deltaX = e.clientX - this.previousMouseX;
 //     const deltaY = e.clientY - this.previousMouseY;
@@ -1608,12 +1939,10 @@ export default AudioVisualizer;
 
 //   update() {
 //     const currentTime = performance.now();
-//     const deltaTime = (currentTime - this.lastTime) / 1000; // Convert to seconds
+//     const deltaTime = (currentTime - this.lastTime) / 1000;
 //     this.lastTime = currentTime;
 
 //     if (this.autoRotate && !this.isDragging) {
-//       // Now rotation speed is consistent regardless of frame rate
-//       // Adjust the multiplier (0.3) to control rotation speed
 //       this.rotationY += this.autoRotateSpeed * deltaTime * 0.3;
 //     }
 
@@ -1643,36 +1972,23 @@ export default AudioVisualizer;
 //   }
 // }
 
-// // Audio Analyzer with Stereo Support
+// // Audio Analyzer
 // class AudioAnalyzer {
-//   context: AudioContext;
-//   analyzerNode: AnalyserNode;
-//   analyzerNodeLeft: AnalyserNode;
-//   analyzerNodeRight: AnalyserNode;
-//   splitter: ChannelSplitterNode;
-//   merger: ChannelMergerNode;
-//   source: MediaElementAudioSourceNode | null = null;
-//   frequencyByteData: Uint8Array;
-//   frequencyByteDataLeft: Uint8Array;
-//   frequencyByteDataRight: Uint8Array;
-//   timeByteData: Uint8Array;
-//   binCount: number;
-//   isConnected = false;
-
-//   constructor(binCount: number = 1024, smoothingTimeConstant: number = 0.85) {
-//     this.context = new (window.AudioContext ||
-//       (window as any).webkitAudioContext)();
+//   constructor(binCount = 1024, smoothingTimeConstant = 0.85) {
+//     this.context = new (window.AudioContext || window.webkitAudioContext)();
 //     this.analyzerNode = this.context.createAnalyser();
 //     this.analyzerNodeLeft = this.context.createAnalyser();
 //     this.analyzerNodeRight = this.context.createAnalyser();
 //     this.splitter = this.context.createChannelSplitter(2);
 //     this.merger = this.context.createChannelMerger(2);
+//     this.source = null;
 //     this.binCount = binCount;
+//     this.isConnected = false;
 //     this.setBinCount(binCount);
 //     this.setSmoothingTimeConstant(smoothingTimeConstant);
 //   }
 
-//   setBinCount(binCount: number) {
+//   setBinCount(binCount) {
 //     this.binCount = binCount;
 //     this.analyzerNode.fftSize = binCount * 2;
 //     this.analyzerNodeLeft.fftSize = binCount * 2;
@@ -1683,13 +1999,13 @@ export default AudioVisualizer;
 //     this.timeByteData = new Uint8Array(binCount);
 //   }
 
-//   setSmoothingTimeConstant(smoothingTimeConstant: number) {
+//   setSmoothingTimeConstant(smoothingTimeConstant) {
 //     this.analyzerNode.smoothingTimeConstant = smoothingTimeConstant;
 //     this.analyzerNodeLeft.smoothingTimeConstant = smoothingTimeConstant;
 //     this.analyzerNodeRight.smoothingTimeConstant = smoothingTimeConstant;
 //   }
 
-//   async init(audioElement: HTMLAudioElement) {
+//   async init(audioElement) {
 //     try {
 //       if (this.context.state === "suspended") {
 //         await this.context.resume();
@@ -1713,26 +2029,8 @@ export default AudioVisualizer;
 //     }
 //   }
 
-//   getFrequencyData() {
-//     return this.frequencyByteData;
-//   }
-
-//   getFrequencyDataLeft() {
-//     return this.frequencyByteDataLeft;
-//   }
-
-//   getFrequencyDataRight() {
-//     return this.frequencyByteDataRight;
-//   }
-
 //   getFrequencyDataSubBass() {
-//     // Assuming this method returns sub-bass data (20-100 Hz)
-//     // Implementation may vary; using frequencyByteData for now
 //     return this.frequencyByteData;
-//   }
-
-//   getTimeData() {
-//     return this.timeByteData;
 //   }
 
 //   updateSample() {
@@ -1743,49 +2041,11 @@ export default AudioVisualizer;
 //   }
 // }
 
-// // Helper function for Catmull-Rom spline
-// function catmullRom(
-//   p0: number,
-//   p1: number,
-//   p2: number,
-//   p3: number,
-//   t: number,
-// ): number {
-//   const v0 = (p2 - p0) * 0.5;
-//   const v1 = (p3 - p1) * 0.5;
-//   const t2 = t * t;
-//   const t3 = t * t * t;
-//   return (
-//     (2.0 * p1 - 2.0 * p2 + v0 + v1) * t3 +
-//     (-3.0 * p1 + 3.0 * p2 - 2.0 * v0 - v1) * t2 +
-//     v0 * t +
-//     p1
-//   );
-// }
-
-// const AudioVisualizer: React.FC = () => {
-//   const containerRef = useRef<HTMLDivElement>(null);
-//   const audioRef = useRef<HTMLAudioElement>(null);
-//   const sceneRef = useRef<{
-//     scene: THREE.Scene;
-//     camera: THREE.PerspectiveCamera;
-//     renderer: THREE.WebGLRenderer;
-//     controls: CameraController;
-//     particles: THREE.Mesh;
-//     pathPositions: Float32Array;
-//     radiusArray: Float32Array;
-//     shakeArray: Float32Array;
-//     rotationArray: Float32Array;
-//     panArray: Float32Array;
-//     analyzer?: AudioAnalyzer;
-//     centerObj?: THREE.Group; // Add this line
-//     lights: {
-//       light1: THREE.PointLight;
-//       light2: THREE.DirectionalLight;
-//       light3: THREE.DirectionalLight;
-//     };
-//   } | null>(null);
-//   const frameId = useRef<number>();
+// const AudioVisualizerWithObject = () => {
+//   const containerRef = useRef(null);
+//   const audioRef = useRef(null);
+//   const sceneRef = useRef(null);
+//   const frameId = useRef();
 //   const [isPlaying, setIsPlaying] = useState(false);
 //   const [showPlayButton, setShowPlayButton] = useState(true);
 //   const [debugInfo, setDebugInfo] = useState("Loading...");
@@ -1814,9 +2074,7 @@ export default AudioVisualizer;
 //   useEffect(() => {
 //     if (!containerRef.current) return;
 
-//     console.log(
-//       "Initializing 77,777 particle system with 5 frequency sections...",
-//     );
+//     console.log("Initializing head-shaped particle system...");
 
 //     // Scene setup
 //     const scene = new THREE.Scene();
@@ -1837,30 +2095,6 @@ export default AudioVisualizer;
 //     containerRef.current.appendChild(renderer.domElement);
 
 //     const controls = new CameraController(camera, renderer.domElement);
-
-//     const loader = new OBJLoader();
-
-//     loader.load(
-//       "/assets/objs/femalehead.obj",
-//       (object) => {
-//         scene.add(object);
-
-//         object.position.set(0, -100, 0);
-//         object.scale.set(24, 24, 24);
-
-//         object.rotation.x = -Math.PI / 2.5;
-
-//         if (sceneRef.current) {
-//           sceneRef.current.centerObj = object;
-//         }
-//       },
-//       (xhr) => {
-//         console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
-//       },
-//       (error) => {
-//         console.error("An error happened", error);
-//       },
-//     );
 
 //     // Lights
 //     const light1 = new THREE.PointLight(0xadd8e6, 0.25, 1200, 2);
@@ -1890,13 +2124,14 @@ export default AudioVisualizer;
 //     );
 //     scene.add(light3);
 
-//     // Create path
+//     // Create path positions array (complex spiral path like original)
 //     const pathPositions = new Float32Array(pathLength * 3);
 //     const radiusArray = new Float32Array(pathLength);
 //     const shakeArray = new Float32Array(pathLength * 3);
 //     const rotationArray = new Float32Array(pathLength);
 //     const panArray = new Float32Array(pathLength);
 
+//     // Create the original complex path
 //     for (let i = 0; i < pathLength; i++) {
 //       let x, y, z;
 //       if (i === 0) {
@@ -1923,329 +2158,418 @@ export default AudioVisualizer;
 //       panArray[i] = 0;
 //     }
 
-//     // Create prefab geometry (sphere)
-//     const prefabGeometry = new THREE.SphereGeometry(2, 4, 4);
-//     const prefabPositions = prefabGeometry.attributes.position;
-//     const prefabNormals = prefabGeometry.attributes.normal;
-//     const prefabIndices = prefabGeometry.index;
+//     // Load OBJ and create particles
+//     loadOBJ("/assets/objs/femalehead.obj")
+//       .then((objData) => {
+//         console.log("OBJ loaded, creating particle system...");
 
-//     const verticesPerPrefab = prefabPositions.count;
-//     const indicesPerPrefab = prefabIndices ? prefabIndices.count : 0;
-//     const totalVertices = particleCount * verticesPerPrefab;
-//     const totalIndices = particleCount * indicesPerPrefab;
+//         // Transform and scale vertices
+//         const headScale = 15;
+//         const headOffsetY = 350;
+//         const headRotationX = -Math.PI / 2.5 + (-15 * Math.PI) / 180;
 
-//     // Create buffer geometry
-//     const geometry = new THREE.BufferGeometry();
-//     const positions = new Float32Array(totalVertices * 3);
-//     const colors = new Float32Array(totalVertices * 3);
-//     const normals = new Float32Array(totalVertices * 3);
-//     const delayDurations = new Float32Array(totalVertices * 2);
-//     const pivots = new Float32Array(totalVertices * 3);
-//     const axisAngles = new Float32Array(totalVertices * 4);
-//     const indices = new Uint32Array(totalIndices);
+//         // Sample points from the head surface
+//         const headPoints = [];
+//         const totalFaces = objData.faces.length;
+//         const pointsPerFace = Math.ceil(particleCount / totalFaces);
 
-//     for (let i = 0; i < particleCount; i++) {
-//       const delay = i * prefabDelay;
-//       const duration =
-//         minDuration + Math.random() * (maxDuration - minDuration);
-//       const pivot = new THREE.Vector3(
-//         Math.random() * 2,
-//         Math.random() * 2,
-//         Math.random() * 2,
-//       );
-//       const axis = new THREE.Vector3(
-//         (Math.random() - 0.5) * 2,
-//         (Math.random() - 0.5) * 2,
-//         (Math.random() - 0.5) * 2,
-//       ).normalize();
-//       const angle = Math.PI * (12 + Math.random() * 12);
+//         objData.faces.forEach((face, faceIndex) => {
+//           if (headPoints.length >= particleCount) return;
 
-//       for (let j = 0; j < verticesPerPrefab; j++) {
-//         const vertexIndex = i * verticesPerPrefab + j;
-//         positions[vertexIndex * 3] = prefabPositions.getX(j);
-//         positions[vertexIndex * 3 + 1] = prefabPositions.getY(j);
-//         positions[vertexIndex * 3 + 2] = prefabPositions.getZ(j);
-//         normals[vertexIndex * 3] = prefabNormals.getX(j);
-//         normals[vertexIndex * 3 + 1] = prefabNormals.getY(j);
-//         normals[vertexIndex * 3 + 2] = prefabNormals.getZ(j);
-//         colors[vertexIndex * 3] = PARTICLE_COLOR.r;
-//         colors[vertexIndex * 3 + 1] = PARTICLE_COLOR.g;
-//         colors[vertexIndex * 3 + 2] = PARTICLE_COLOR.b;
-//         delayDurations[vertexIndex * 2] = delay + j * vertexDelay;
-//         delayDurations[vertexIndex * 2 + 1] = duration;
-//         pivots[vertexIndex * 3] = pivot.x;
-//         pivots[vertexIndex * 3 + 1] = pivot.y;
-//         pivots[vertexIndex * 3 + 2] = pivot.z;
-//         axisAngles[vertexIndex * 4] = axis.x;
-//         axisAngles[vertexIndex * 4 + 1] = axis.y;
-//         axisAngles[vertexIndex * 4 + 2] = axis.z;
-//         axisAngles[vertexIndex * 4 + 3] = angle;
-//       }
+//           // Get vertices of the face
+//           const v1 = objData.vertices[face[0]];
+//           const v2 = objData.vertices[face[1]];
+//           const v3 = objData.vertices[face[2]];
 
-//       if (prefabIndices) {
-//         for (let j = 0; j < indicesPerPrefab; j++) {
-//           indices[i * indicesPerPrefab + j] =
-//             prefabIndices.getX(j) + i * verticesPerPrefab;
-//         }
-//       }
-//     }
-
-//     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-//     geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-//     geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
-//     geometry.setAttribute(
-//       "aDelayDuration",
-//       new THREE.BufferAttribute(delayDurations, 2),
-//     );
-//     geometry.setAttribute("aPivot", new THREE.BufferAttribute(pivots, 3));
-//     geometry.setAttribute(
-//       "aAxisAngle",
-//       new THREE.BufferAttribute(axisAngles, 4),
-//     );
-//     geometry.setIndex(new THREE.BufferAttribute(indices, 1));
-
-//     // Vertex shader
-//     const vertexShader = `
-//       #define PATH_LENGTH ${pathLength}
-
-//       uniform float uTime;
-//       uniform vec3 uPath[PATH_LENGTH];
-//       uniform float uRadius[PATH_LENGTH];
-//       uniform vec3 uShake[PATH_LENGTH];
-//       uniform float uRotation[PATH_LENGTH];
-//       uniform float uPan[PATH_LENGTH];
-//       uniform vec2 uRoundness;
-//       uniform float uParticleScale;
-
-//       attribute vec2 aDelayDuration;
-//       attribute vec3 aPivot;
-//       attribute vec4 aAxisAngle;
-
-//       varying vec3 vColor;
-//       varying vec3 vNormal;
-//       varying vec3 vWorldPosition;
-
-//       vec3 rotateVector(vec4 q, vec3 v) {
-//         return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
-//       }
-
-//       vec4 quatFromAxisAngle(vec3 axis, float angle) {
-//         float halfAngle = angle * 0.5;
-//         return vec4(axis.xyz * sin(halfAngle), cos(halfAngle));
-//       }
-
-//       float catmullRom(float p0, float p1, float p2, float p3, float t) {
-//         float v0 = (p2 - p0) * 0.5;
-//         float v1 = (p3 - p1) * 0.5;
-//         float t2 = t * t;
-//         float t3 = t * t * t;
-//         return (2.0 * p1 - 2.0 * p2 + v0 + v1) * t3 + (-3.0 * p1 + 3.0 * p2 - 2.0 * v0 - v1) * t2 + v0 * t + p1;
-//       }
-
-//       vec3 catmullRom(vec3 p0, vec3 p1, vec3 p2, vec3 p3, vec2 c, float t) {
-//         vec3 v0 = (p2 - p0) * c.x;
-//         vec3 v1 = (p3 - p1) * c.y;
-//         float t2 = t * t;
-//         float t3 = t * t * t;
-//         return vec3((2.0 * p1 - 2.0 * p2 + v0 + v1) * t3 + (-3.0 * p1 + 3.0 * p2 - 2.0 * v0 - v1) * t2 + v0 * t + p1);
-//       }
-
-//       vec3 catmullRomShake(vec3 s0, vec3 s1, vec3 s2, vec3 s3, float t) {
-//         return vec3(
-//           catmullRom(s0.x, s1.x, s2.x, s3.x, t),
-//           catmullRom(s0.y, s1.y, s2.y, s3.y, t),
-//           catmullRom(s0.z, s1.z, s2.z, s3.z, t)
-//         );
-//       }
-
-//       void main() {
-//         vColor = color;
-//         float tDelay = aDelayDuration.x;
-//         float tDuration = aDelayDuration.y;
-//         float tTime = clamp(uTime - tDelay, 0.0, tDuration);
-//         float tProgress = tTime / tDuration;
-//         float angle = aAxisAngle.w * tProgress;
-//         vec4 tQuat = quatFromAxisAngle(aAxisAngle.xyz, angle);
-
-//         vec3 objectNormal = normal;
-//         objectNormal = rotateVector(tQuat, objectNormal);
-
-//         vec3 transformed = position;
-//         float tMax = float(PATH_LENGTH - 1);
-//         float tPoint = tMax * tProgress;
-//         float tIndex = floor(tPoint);
-//         float tWeight = tPoint - tIndex;
-
-//         int i0 = int(max(0.0, tIndex - 1.0));
-//         int i1 = int(tIndex);
-//         int i2 = int(min(tIndex + 1.0, tMax));
-//         int i3 = int(min(tIndex + 2.0, tMax));
-
-//         vec3 p0 = uPath[i0];
-//         vec3 p1 = uPath[i1];
-//         vec3 p2 = uPath[i2];
-//         vec3 p3 = uPath[i3];
-
-//         vec3 s0 = uShake[i0];
-//         vec3 s1 = uShake[i1];
-//         vec3 s2 = uShake[i2];
-//         vec3 s3 = uShake[i3];
-//         vec3 shake = catmullRomShake(s0, s1, s2, s3, tWeight);
-
-//         float rotation = catmullRom(uRotation[i0], uRotation[i1], uRotation[i2], uRotation[i3], tWeight);
-//         float pan = catmullRom(uPan[i0], uPan[i1], uPan[i2], uPan[i3], tWeight);
-//         float radius = catmullRom(uRadius[i0], uRadius[i1], uRadius[i2], uRadius[i3], tWeight);
-
-//         float particleAngle = atan(aPivot.z, aPivot.x);
-//         float panEffect = 1.0 + pan * cos(particleAngle) * 0.5;
-//         radius *= panEffect;
-
-//         transformed += aPivot * radius;
-
-//         if (abs(rotation) > 0.01) {
-//           mat3 rotMat = mat3(
-//             cos(rotation), 0.0, sin(rotation),
-//             0.0, 1.0, 0.0,
-//             -sin(rotation), 0.0, cos(rotation)
+//           // Sample random points on the triangle
+//           const numSamples = Math.min(
+//             pointsPerFace,
+//             particleCount - headPoints.length,
 //           );
-//           transformed = rotMat * transformed;
+//           for (let i = 0; i < numSamples; i++) {
+//             // Random barycentric coordinates
+//             let r1 = Math.random();
+//             let r2 = Math.random();
+//             if (r1 + r2 > 1) {
+//               r1 = 1 - r1;
+//               r2 = 1 - r2;
+//             }
+//             const r3 = 1 - r1 - r2;
+
+//             // Interpolate position
+//             let x = v1.x * r1 + v2.x * r2 + v3.x * r3;
+//             let y = v1.y * r1 + v2.y * r2 + v3.y * r3;
+//             let z = v1.z * r1 + v2.z * r2 + v3.z * r3;
+
+//             // Apply transformations
+//             const rotatedX = x;
+//             const rotatedY =
+//               y * Math.cos(headRotationX) - z * Math.sin(headRotationX);
+//             const rotatedZ =
+//               y * Math.sin(headRotationX) + z * Math.cos(headRotationX);
+
+//             headPoints.push({
+//               x: rotatedX * headScale,
+//               y: rotatedY * headScale + headOffsetY,
+//               z: rotatedZ * headScale,
+//             });
+//           }
+//         });
+
+//         // Create prefab geometry (sphere)
+//         const prefabGeometry = new THREE.SphereGeometry(2, 4, 4);
+//         const prefabPositions = prefabGeometry.attributes.position;
+//         const prefabNormals = prefabGeometry.attributes.normal;
+//         const prefabIndices = prefabGeometry.index;
+
+//         const verticesPerPrefab = prefabPositions.count;
+//         const indicesPerPrefab = prefabIndices ? prefabIndices.count : 0;
+//         const totalVertices = particleCount * verticesPerPrefab;
+//         const totalIndices = particleCount * indicesPerPrefab;
+
+//         // Create buffer geometry
+//         const geometry = new THREE.BufferGeometry();
+//         const positions = new Float32Array(totalVertices * 3);
+//         const colors = new Float32Array(totalVertices * 3);
+//         const normals = new Float32Array(totalVertices * 3);
+//         const delayDurations = new Float32Array(totalVertices * 2);
+//         const pivots = new Float32Array(totalVertices * 3);
+//         const axisAngles = new Float32Array(totalVertices * 4);
+//         const headPositions = new Float32Array(totalVertices * 3);
+//         const indices = new Uint32Array(totalIndices);
+
+//         for (let i = 0; i < particleCount; i++) {
+//           const delay = i * prefabDelay;
+//           const duration =
+//             minDuration + Math.random() * (maxDuration - minDuration);
+//           const pivot = new THREE.Vector3(
+//             Math.random() * 2,
+//             Math.random() * 2,
+//             Math.random() * 2,
+//           );
+//           const axis = new THREE.Vector3(
+//             (Math.random() - 0.5) * 2,
+//             (Math.random() - 0.5) * 2,
+//             (Math.random() - 0.5) * 2,
+//           ).normalize();
+//           const angle = Math.PI * (12 + Math.random() * 12);
+
+//           const headPoint = headPoints[i % headPoints.length];
+
+//           for (let j = 0; j < verticesPerPrefab; j++) {
+//             const vertexIndex = i * verticesPerPrefab + j;
+//             positions[vertexIndex * 3] = prefabPositions.getX(j);
+//             positions[vertexIndex * 3 + 1] = prefabPositions.getY(j);
+//             positions[vertexIndex * 3 + 2] = prefabPositions.getZ(j);
+//             normals[vertexIndex * 3] = prefabNormals.getX(j);
+//             normals[vertexIndex * 3 + 1] = prefabNormals.getY(j);
+//             normals[vertexIndex * 3 + 2] = prefabNormals.getZ(j);
+//             colors[vertexIndex * 3] = PARTICLE_COLOR.r;
+//             colors[vertexIndex * 3 + 1] = PARTICLE_COLOR.g;
+//             colors[vertexIndex * 3 + 2] = PARTICLE_COLOR.b;
+//             delayDurations[vertexIndex * 2] = delay + j * vertexDelay;
+//             delayDurations[vertexIndex * 2 + 1] = duration;
+//             pivots[vertexIndex * 3] = pivot.x;
+//             pivots[vertexIndex * 3 + 1] = pivot.y;
+//             pivots[vertexIndex * 3 + 2] = pivot.z;
+//             axisAngles[vertexIndex * 4] = axis.x;
+//             axisAngles[vertexIndex * 4 + 1] = axis.y;
+//             axisAngles[vertexIndex * 4 + 2] = axis.z;
+//             axisAngles[vertexIndex * 4 + 3] = angle;
+//             headPositions[vertexIndex * 3] = headPoint.x;
+//             headPositions[vertexIndex * 3 + 1] = headPoint.y;
+//             headPositions[vertexIndex * 3 + 2] = headPoint.z;
+//           }
+
+//           if (prefabIndices) {
+//             for (let j = 0; j < indicesPerPrefab; j++) {
+//               indices[i * indicesPerPrefab + j] =
+//                 prefabIndices.getX(j) + i * verticesPerPrefab;
+//             }
+//           }
 //         }
 
-//         transformed = rotateVector(tQuat, transformed);
-//         transformed *= uParticleScale;
+//         geometry.setAttribute(
+//           "position",
+//           new THREE.BufferAttribute(positions, 3),
+//         );
+//         geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+//         geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+//         geometry.setAttribute(
+//           "aDelayDuration",
+//           new THREE.BufferAttribute(delayDurations, 2),
+//         );
+//         geometry.setAttribute("aPivot", new THREE.BufferAttribute(pivots, 3));
+//         geometry.setAttribute(
+//           "aAxisAngle",
+//           new THREE.BufferAttribute(axisAngles, 4),
+//         );
+//         geometry.setAttribute(
+//           "aHeadPosition",
+//           new THREE.BufferAttribute(headPositions, 3),
+//         );
+//         geometry.setIndex(new THREE.BufferAttribute(indices, 1));
 
-//         vec3 basePosition = catmullRom(p0, p1, p2, p3, uRoundness, tWeight);
-//         transformed += basePosition + shake;
+//         // Vertex shader - now properly uses the complex path and converges to head
+//         const vertexShader = `
+//         #define PATH_LENGTH ${pathLength}
 
-//         vec4 mvPosition = modelViewMatrix * vec4(transformed, 1.0);
-//         gl_Position = projectionMatrix * mvPosition;
+//         uniform float uTime;
+//         uniform vec3 uPath[PATH_LENGTH];
+//         uniform float uRadius[PATH_LENGTH];
+//         uniform vec3 uShake[PATH_LENGTH];
+//         uniform float uRotation[PATH_LENGTH];
+//         uniform float uPan[PATH_LENGTH];
+//         uniform vec2 uRoundness;
+//         uniform float uParticleScale;
 
-//         vNormal = normalize(normalMatrix * objectNormal);
-//         vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
-//       }
-//     `;
+//         attribute vec2 aDelayDuration;
+//         attribute vec3 aPivot;
+//         attribute vec4 aAxisAngle;
+//         attribute vec3 aHeadPosition;
 
-//     // Fragment shader
-//     const fragmentShader = `
-//       uniform vec3 uEmissive;
-//       uniform vec3 uLightPos1;
-//       uniform vec3 uLightPos2;
-//       uniform vec3 uLightPos3;
-//       uniform vec3 uLightColor1;
-//       uniform vec3 uLightColor2;
-//       uniform vec3 uLightColor3;
-//       uniform float uLightIntensity1;
-//       uniform float uLightIntensity2;
-//       uniform float uLightIntensity3;
+//         varying vec3 vColor;
+//         varying vec3 vNormal;
+//         varying vec3 vWorldPosition;
 
-//       varying vec3 vColor;
-//       varying vec3 vNormal;
-//       varying vec3 vWorldPosition;
+//         vec3 rotateVector(vec4 q, vec3 v) {
+//           return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
+//         }
 
-//       void main() {
-//         vec3 normal = normalize(vNormal);
-//         vec3 finalColor = uEmissive * vColor;
+//         vec4 quatFromAxisAngle(vec3 axis, float angle) {
+//           float halfAngle = angle * 0.5;
+//           return vec4(axis.xyz * sin(halfAngle), cos(halfAngle));
+//         }
 
-//         vec3 lightDir1 = normalize(uLightPos1 - vWorldPosition);
-//         float diff1 = max(dot(normal, lightDir1), 0.0);
-//         float distance1 = length(uLightPos1 - vWorldPosition);
-//         float attenuation1 = 1.0 / (1.0 + 0.001 * distance1 + 0.0001 * distance1 * distance1);
-//         finalColor += vColor * uLightColor1 * diff1 * uLightIntensity1 * attenuation1;
+//         float catmullRom(float p0, float p1, float p2, float p3, float t) {
+//           float v0 = (p2 - p0) * 0.5;
+//           float v1 = (p3 - p1) * 0.5;
+//           float t2 = t * t;
+//           float t3 = t * t * t;
+//           return (2.0 * p1 - 2.0 * p2 + v0 + v1) * t3 + (-3.0 * p1 + 3.0 * p2 - 2.0 * v0 - v1) * t2 + v0 * t + p1;
+//         }
 
-//         vec3 lightDir2 = normalize(uLightPos2);
-//         float diff2 = max(dot(normal, lightDir2), 0.0);
-//         finalColor += vColor * uLightColor2 * diff2 * uLightIntensity2;
+//         vec3 catmullRom(vec3 p0, vec3 p1, vec3 p2, vec3 p3, vec2 c, float t) {
+//           vec3 v0 = (p2 - p0) * c.x;
+//           vec3 v1 = (p3 - p1) * c.y;
+//           float t2 = t * t;
+//           float t3 = t * t * t;
+//           return vec3((2.0 * p1 - 2.0 * p2 + v0 + v1) * t3 + (-3.0 * p1 + 3.0 * p2 - 2.0 * v0 - v1) * t2 + v0 * t + p1);
+//         }
 
-//         vec3 lightDir3 = normalize(uLightPos3);
-//         float diff3 = max(dot(normal, lightDir3), 0.0);
-//         finalColor += vColor * uLightColor3 * diff3 * uLightIntensity3;
+//         vec3 catmullRomShake(vec3 s0, vec3 s1, vec3 s2, vec3 s3, float t) {
+//           return vec3(
+//             catmullRom(s0.x, s1.x, s2.x, s3.x, t),
+//             catmullRom(s0.y, s1.y, s2.y, s3.y, t),
+//             catmullRom(s0.z, s1.z, s2.z, s3.z, t)
+//           );
+//         }
 
-//         finalColor += vColor * 0.1;
+//         void main() {
+//           vColor = color;
+//           float tDelay = aDelayDuration.x;
+//           float tDuration = aDelayDuration.y;
+//           float tTime = clamp(uTime - tDelay, 0.0, tDuration);
+//           float tProgress = tTime / tDuration;
+//           float angle = aAxisAngle.w * tProgress;
+//           vec4 tQuat = quatFromAxisAngle(aAxisAngle.xyz, angle);
 
-//         gl_FragColor = vec4(finalColor, 1.0);
-//       }
-//     `;
+//           vec3 objectNormal = normal;
+//           objectNormal = rotateVector(tQuat, objectNormal);
 
-//     // Create material
-//     const material = new THREE.ShaderMaterial({
-//       uniforms: {
-//         uTime: { value: 0 },
-//         uPath: { value: pathPositions },
-//         uRadius: { value: radiusArray },
-//         uShake: { value: shakeArray },
-//         uRotation: { value: rotationArray },
-//         uPan: { value: panArray },
-//         uRoundness: { value: new THREE.Vector2(2, 2) },
-//         uParticleScale: { value: 1.0 },
-//         uEmissive: {
-//           value: new THREE.Color(
-//             PARTICLE_COLOR.emissive.r,
-//             PARTICLE_COLOR.emissive.g,
-//             PARTICLE_COLOR.emissive.b,
-//           ),
-//         },
-//         uLightPos1: { value: new THREE.Vector3(0, 0, 0) },
-//         uLightPos2: { value: new THREE.Vector3(0, 1, 1) },
-//         uLightPos3: { value: new THREE.Vector3(0, 1, -1) },
-//         uLightColor1: {
-//           value: new THREE.Color(
-//             PARTICLE_COLOR.lights.color1.r,
-//             PARTICLE_COLOR.lights.color1.g,
-//             PARTICLE_COLOR.lights.color1.b,
-//           ),
-//         },
-//         uLightColor2: {
-//           value: new THREE.Color(
-//             PARTICLE_COLOR.lights.color2.r,
-//             PARTICLE_COLOR.lights.color2.g,
-//             PARTICLE_COLOR.lights.color2.b,
-//           ),
-//         },
-//         uLightColor3: {
-//           value: new THREE.Color(
-//             PARTICLE_COLOR.lights.color3.r,
-//             PARTICLE_COLOR.lights.color3.g,
-//             PARTICLE_COLOR.lights.color3.b,
-//           ),
-//         },
-//         uLightIntensity1: { value: 0.25 },
-//         uLightIntensity2: { value: 0.25 },
-//         uLightIntensity3: { value: 0.25 },
-//       },
-//       vertexShader,
-//       fragmentShader,
-//       vertexColors: true,
-//       side: THREE.DoubleSide,
-//     });
+//           vec3 transformed = position;
+//           float tMax = float(PATH_LENGTH - 1);
+//           float tPoint = tMax * tProgress;
+//           float tIndex = floor(tPoint);
+//           float tWeight = tPoint - tIndex;
 
-//     const particles = new THREE.Mesh(geometry, material);
-//     particles.frustumCulled = false;
-//     scene.add(particles);
+//           int i0 = int(max(0.0, tIndex - 1.0));
+//           int i1 = int(tIndex);
+//           int i2 = int(min(tIndex + 1.0, tMax));
+//           int i3 = int(min(tIndex + 2.0, tMax));
 
-//     // Store references
-//     sceneRef.current = {
-//       scene,
-//       camera,
-//       renderer,
-//       controls,
-//       particles,
-//       pathPositions,
-//       radiusArray,
-//       shakeArray,
-//       rotationArray,
-//       panArray,
-//       lights: { light1, light2, light3 },
-//       analyzer: undefined,
-//     };
+//           vec3 p0 = uPath[i0];
+//           vec3 p1 = uPath[i1];
+//           vec3 p2 = uPath[i2];
+//           vec3 p3 = uPath[i3];
 
-//     setDebugInfo("Ready to play");
-//     console.log("Particle system ready");
+//           vec3 s0 = uShake[i0];
+//           vec3 s1 = uShake[i1];
+//           vec3 s2 = uShake[i2];
+//           vec3 s3 = uShake[i3];
+//           vec3 shake = catmullRomShake(s0, s1, s2, s3, tWeight);
+
+//           float rotation = catmullRom(uRotation[i0], uRotation[i1], uRotation[i2], uRotation[i3], tWeight);
+//           float pan = catmullRom(uPan[i0], uPan[i1], uPan[i2], uPan[i3], tWeight);
+//           float radius = catmullRom(uRadius[i0], uRadius[i1], uRadius[i2], uRadius[i3], tWeight);
+
+//           float particleAngle = atan(aPivot.z, aPivot.x);
+//           float panEffect = 1.0 + pan * cos(particleAngle) * 0.5;
+//           radius *= panEffect;
+
+//           transformed += aPivot * radius;
+
+//           if (abs(rotation) > 0.01) {
+//             mat3 rotMat = mat3(
+//               cos(rotation), 0.0, sin(rotation),
+//               0.0, 1.0, 0.0,
+//               -sin(rotation), 0.0, cos(rotation)
+//             );
+//             transformed = rotMat * transformed;
+//           }
+
+//           transformed = rotateVector(tQuat, transformed);
+//           transformed *= uParticleScale;
+
+//           // Get base position from the complex path
+//           vec3 basePosition = catmullRom(p0, p1, p2, p3, uRoundness, tWeight);
+
+//           // Calculate head influence - stronger at the end of the path
+//           float headInfluence = smoothstep(0.6, 0.95, tProgress);
+
+//           // Blend between the path position and head position
+//           vec3 targetHeadPos = aHeadPosition;
+//           basePosition = mix(basePosition, targetHeadPos, headInfluence);
+
+//           // Reduce the radius influence as particles approach head shape
+//           float radiusReduction = 1.0 - headInfluence * 0.7;
+//           transformed *= radiusReduction;
+
+//           transformed += basePosition + shake;
+
+//           vec4 mvPosition = modelViewMatrix * vec4(transformed, 1.0);
+//           gl_Position = projectionMatrix * mvPosition;
+
+//           vNormal = normalize(normalMatrix * objectNormal);
+//           vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
+//         }
+//       `;
+
+//         // Fragment shader (same as original)
+//         const fragmentShader = `
+//         uniform vec3 uEmissive;
+//         uniform vec3 uLightPos1;
+//         uniform vec3 uLightPos2;
+//         uniform vec3 uLightPos3;
+//         uniform vec3 uLightColor1;
+//         uniform vec3 uLightColor2;
+//         uniform vec3 uLightColor3;
+//         uniform float uLightIntensity1;
+//         uniform float uLightIntensity2;
+//         uniform float uLightIntensity3;
+
+//         varying vec3 vColor;
+//         varying vec3 vNormal;
+//         varying vec3 vWorldPosition;
+
+//         void main() {
+//           vec3 normal = normalize(vNormal);
+//           vec3 finalColor = uEmissive * vColor;
+
+//           vec3 lightDir1 = normalize(uLightPos1 - vWorldPosition);
+//           float diff1 = max(dot(normal, lightDir1), 0.0);
+//           float distance1 = length(uLightPos1 - vWorldPosition);
+//           float attenuation1 = 1.0 / (1.0 + 0.001 * distance1 + 0.0001 * distance1 * distance1);
+//           finalColor += vColor * uLightColor1 * diff1 * uLightIntensity1 * attenuation1;
+
+//           vec3 lightDir2 = normalize(uLightPos2);
+//           float diff2 = max(dot(normal, lightDir2), 0.0);
+//           finalColor += vColor * uLightColor2 * diff2 * uLightIntensity2;
+
+//           vec3 lightDir3 = normalize(uLightPos3);
+//           float diff3 = max(dot(normal, lightDir3), 0.0);
+//           finalColor += vColor * uLightColor3 * diff3 * uLightIntensity3;
+
+//           finalColor += vColor * 0.1;
+
+//           gl_FragColor = vec4(finalColor, 1.0);
+//         }
+//       `;
+
+//         // Create material
+//         const material = new THREE.ShaderMaterial({
+//           uniforms: {
+//             uTime: { value: 0 },
+//             uPath: { value: pathPositions },
+//             uRadius: { value: radiusArray },
+//             uShake: { value: shakeArray },
+//             uRotation: { value: rotationArray },
+//             uPan: { value: panArray },
+//             uRoundness: { value: new THREE.Vector2(2, 2) },
+//             uParticleScale: { value: 1.0 },
+//             uEmissive: {
+//               value: new THREE.Color(
+//                 PARTICLE_COLOR.emissive.r,
+//                 PARTICLE_COLOR.emissive.g,
+//                 PARTICLE_COLOR.emissive.b,
+//               ),
+//             },
+//             uLightPos1: { value: new THREE.Vector3(0, 0, 0) },
+//             uLightPos2: { value: new THREE.Vector3(0, 1, 1) },
+//             uLightPos3: { value: new THREE.Vector3(0, 1, -1) },
+//             uLightColor1: {
+//               value: new THREE.Color(
+//                 PARTICLE_COLOR.lights.color1.r,
+//                 PARTICLE_COLOR.lights.color1.g,
+//                 PARTICLE_COLOR.lights.color1.b,
+//               ),
+//             },
+//             uLightColor2: {
+//               value: new THREE.Color(
+//                 PARTICLE_COLOR.lights.color2.r,
+//                 PARTICLE_COLOR.lights.color2.g,
+//                 PARTICLE_COLOR.lights.color2.b,
+//               ),
+//             },
+//             uLightColor3: {
+//               value: new THREE.Color(
+//                 PARTICLE_COLOR.lights.color3.r,
+//                 PARTICLE_COLOR.lights.color3.g,
+//                 PARTICLE_COLOR.lights.color3.b,
+//               ),
+//             },
+//             uLightIntensity1: { value: 0.25 },
+//             uLightIntensity2: { value: 0.25 },
+//             uLightIntensity3: { value: 0.25 },
+//           },
+//           vertexShader,
+//           fragmentShader,
+//           vertexColors: true,
+//           side: THREE.DoubleSide,
+//         });
+
+//         const particles = new THREE.Mesh(geometry, material);
+//         particles.frustumCulled = false;
+//         scene.add(particles);
+
+//         // Store references
+//         sceneRef.current = {
+//           scene,
+//           camera,
+//           renderer,
+//           controls,
+//           particles,
+//           pathPositions,
+//           radiusArray,
+//           shakeArray,
+//           rotationArray,
+//           panArray,
+//           lights: { light1, light2, light3 },
+//           analyzer: undefined,
+//         };
+
+//         setDebugInfo("Ready to play");
+//         console.log("Head-shaped particle system ready");
+//       })
+//       .catch((error) => {
+//         console.error("Error loading OBJ:", error);
+//         setDebugInfo("Error loading model");
+//       });
 
 //     // Animation loop
 //     let frameCount = 0;
 //     const animate = () => {
 //       frameId.current = requestAnimationFrame(animate);
-//       // frameCount++;
 
 //       const currentTime = performance.now();
 //       const deltaTime = (currentTime - animState.current.lastFrameTime) / 1000;
@@ -2259,6 +2583,7 @@ export default AudioVisualizer;
 //         scene,
 //         controls,
 //         particles,
+//         pathPositions,
 //         radiusArray,
 //         shakeArray,
 //         rotationArray,
@@ -2269,15 +2594,15 @@ export default AudioVisualizer;
 //       controls.update();
 
 //       anim.time = audioRef.current?.currentTime || 0;
-//       if (particles.material && particles.material.uniforms) {
+//       if (particles && particles.material && particles.material.uniforms) {
 //         particles.material.uniforms.uTime.value = anim.time;
 //       }
 
-//       anim.shakePhase += 0.3 * deltaTime * 60; // Normalized to 60fps
+//       anim.shakePhase += 0.3 * deltaTime * 60;
 //       anim.rotationPhase += 0.02 * deltaTime * 60;
 //       anim.noiseOffset += 0.01 * deltaTime * 60;
 
-//       // Audio processing
+//       // Audio processing (same as original)
 //       if (
 //         sceneRef.current.analyzer &&
 //         isPlayingRef.current &&
@@ -2289,7 +2614,7 @@ export default AudioVisualizer;
 //         const dataLeft = sceneRef.current.analyzer.frequencyByteDataLeft;
 //         const dataRight = sceneRef.current.analyzer.frequencyByteDataRight;
 //         const dataSubBass = sceneRef.current.analyzer.getFrequencyDataSubBass();
-//         const dataArray: number[] = [];
+//         const dataArray = [];
 //         const cap = data.length * 0.5;
 
 //         anim.noiseOffset += 0.01;
@@ -2297,10 +2622,10 @@ export default AudioVisualizer;
 //         // Calculate frequency bands
 //         const sampleRate = 44100;
 //         const binHz = sampleRate / (sceneRef.current.analyzer.binCount * 2);
-//         const subBassEnd = Math.floor(60 / binHz); // 20-100 Hz
-//         const lowBassEnd = Math.floor(400 / binHz); // 100-250 Hz
-//         const lowMidEnd = Math.floor(1500 / binHz); // 250-1500 Hz
-//         const highMidEnd = Math.floor(3000 / binHz); // 1500-3000 Hz
+//         const subBassEnd = Math.floor(60 / binHz);
+//         const lowBassEnd = Math.floor(400 / binHz);
+//         const lowMidEnd = Math.floor(1500 / binHz);
+//         const highMidEnd = Math.floor(3000 / binHz);
 
 //         // Calculate averages for each band
 //         let subBassTotal = 0,
@@ -2381,7 +2706,7 @@ export default AudioVisualizer;
 //         let highRightAvg = highRight / Math.max(1, cap - highMidEnd) / 255;
 
 //         // Calculate stereo pan
-//         const calculatePan = (left: number, right: number) => {
+//         const calculatePan = (left, right) => {
 //           if (left + right > 0.01) {
 //             return (right - left) / (left + right);
 //           }
@@ -2401,25 +2726,14 @@ export default AudioVisualizer;
 //         let isBassHit = false;
 
 //         // DO SOMETHING IF BASS HIT
-//         // if (
-//         //   subBassAvg > BASS_CONFIG.subBassThreshold &&
-//         //   subBassAvg > anim.previousBassAvg * 1.2 &&
-//         //   now - subBassPeakTime > 50
-//         // ) {
-//         //   isBassHit = true;
-
-//         //   console.log("BASS HIT");
-//         //   animState.current.subBassPeak =
-//         //     subBassAvg * BASS_CONFIG.subBassAttack;
-//         //   animState.current.subBassPeakTime = now;
-//         //   anim.bassHitTime = now;
-//         // } else {
-//         //   animState.current.subBassPeak *= BASS_CONFIG.subBassDecay;
-//         //   if (animState.current.subBassPeak < 0.03) {
-//         //     animState.current.subBassPeak = 0;
-//         //   }
-//         // }
-
+//         if (
+//           subBassAvg > BASS_CONFIG.subBassThreshold &&
+//           subBassAvg > anim.previousBassAvg * 1.1 &&
+//           now - subBassPeakTime > 150
+//         ) {
+//           isBassHit = true;
+//           console.log(isBassHit);
+//         }
 //         anim.previousBassAvg = subBassAvg;
 //         subBassAvg = Math.max(subBassAvg, animState.current.subBassPeak);
 
@@ -2445,7 +2759,7 @@ export default AudioVisualizer;
 //           0.05 *
 //           highAvg;
 
-//         // Update camera rotation speed based on sub-bass (from previous code)
+//         // Update camera rotation speed based on sub-bass
 //         let rotSpeed = 2.0 + subBassAvg * BASS_CONFIG.rotationSpeedMax;
 //         rotSpeed += Math.sin(anim.noiseOffset * 0.7) * 0.5;
 //         if (Date.now() - anim.bassHitTime < 500) {
@@ -2454,8 +2768,7 @@ export default AudioVisualizer;
 //         controls.autoRotateSpeed = rotSpeed;
 
 //         // Complex radius calculation
-//         const currentTime = audioRef.current.currentTime || 0;
-//         const prefabDelay = 0.00015;
+//         const currentTimeVal = audioRef.current.currentTime || 0;
 //         let minVisibleProgress = 1.0;
 //         let maxVisibleProgress = 0.0;
 //         let avgDuration = 170;
@@ -2463,7 +2776,7 @@ export default AudioVisualizer;
 
 //         for (let i = 0; i < cap; i++) {
 //           const segmentDelay = i * prefabDelay;
-//           const timeInPath = currentTime - segmentDelay;
+//           const timeInPath = currentTimeVal - segmentDelay;
 //           const progressAlongPath = Math.min(
 //             1.0,
 //             Math.max(0.0, timeInPath / avgDuration),
@@ -2523,7 +2836,7 @@ export default AudioVisualizer;
 //           for (let i = 0; i < cap; i++) {
 //             let idx = pass === 1 ? cap - 1 - i : i;
 //             const segmentDelay = (pass < 2 ? i : i + cap) * prefabDelay;
-//             const timeInPath = currentTime - segmentDelay;
+//             const timeInPath = currentTimeVal - segmentDelay;
 //             const progressAlongPath = Math.min(
 //               1.0,
 //               Math.max(0.0, timeInPath / avgDuration),
@@ -2677,7 +2990,7 @@ export default AudioVisualizer;
 //         }
 
 //         // Update material uniforms
-//         if (particles.material && particles.material.uniforms) {
+//         if (particles && particles.material && particles.material.uniforms) {
 //           const r =
 //             BASS_CONFIG.roundnessMultiplier * Math.pow(subBassAvg, 2) + 1;
 //           particles.material.uniforms.uRoundness.value.set(
@@ -2698,10 +3011,12 @@ export default AudioVisualizer;
 //           particleScale +=
 //             Math.sin(anim.noiseOffset * 5 + anim.randomSeed) * 0.05;
 //           particles.material.uniforms.uParticleScale.value = particleScale;
+//           particles.material.uniforms.uPath.value = pathPositions;
 //           particles.material.uniforms.uRadius.value = radiusArray;
 //           particles.material.uniforms.uShake.value = shakeArray;
 //           particles.material.uniforms.uRotation.value = rotationArray;
 //           particles.material.uniforms.uPan.value = panArray;
+//           particles.material.uniforms.uPath.needsUpdate = true;
 //           particles.material.uniforms.uRadius.needsUpdate = true;
 //           particles.material.uniforms.uShake.needsUpdate = true;
 //           particles.material.uniforms.uRotation.needsUpdate = true;
@@ -2721,7 +3036,7 @@ export default AudioVisualizer;
 //         lights.light3.intensity =
 //           Math.pow(lightIntensity, 3) * 0.5 * (0.9 + Math.random() * 0.1);
 
-//         if (particles.material && particles.material.uniforms) {
+//         if (particles && particles.material && particles.material.uniforms) {
 //           particles.material.uniforms.uLightIntensity1.value =
 //             lights.light1.intensity;
 //           particles.material.uniforms.uLightIntensity2.value =
@@ -2791,7 +3106,7 @@ export default AudioVisualizer;
 
 //         if (frameCount % 30 === 0) {
 //           setDebugInfo(
-//             `Sub: ${(subBassAvg * 100).toFixed(0)}% | Peak: ${(animState.current.subBassPeak * 100).toFixed(0)}% | Low: ${(lowBassAvg * 100).toFixed(0)}% | LMid: ${(lowMidAvg * 100).toFixed(0)}% | HMid: ${(highMidAvg * 100).toFixed(0)}% | High: ${(highAvg * 100).toFixed(0)}% | Pan: ${subBassPan.toFixed(2)}`,
+//             `Sub: ${(subBassAvg * 100).toFixed(0)}% | Peak: ${(animState.current.subBassPeak * 100).toFixed(0)}% | Low: ${(lowBassAvg * 100).toFixed(0)}% | Mid: ${(lowMidAvg * 100).toFixed(0)}% | High: ${(highAvg * 100).toFixed(0)}%`,
 //           );
 //         }
 //       } else {
@@ -2803,7 +3118,7 @@ export default AudioVisualizer;
 //           rotationArray[i] = 0;
 //           panArray[i] = 0;
 //         }
-//         controls.autoRotateSpeed = 0.1; // Default rotation when not playing
+//         controls.autoRotateSpeed = 0.1;
 //       }
 
 //       renderer.render(scene, camera);
@@ -2893,10 +3208,10 @@ export default AudioVisualizer;
 //               onClick={handlePlay}
 //               className="mb-4 rounded-lg bg-red-600 px-8 py-4 text-xl font-bold text-white shadow-lg transition-colors duration-200 hover:bg-red-700"
 //             >
-//               Play 77,777 Particles
+//               Play Head-Shaped Particles
 //             </button>
 //             <p className="text-sm text-white">
-//               Particles will flow along a path and react to music
+//               77,777 particles will form a head shape and react to music
 //             </p>
 //           </div>
 //         </div>
@@ -2909,4 +3224,4 @@ export default AudioVisualizer;
 //   );
 // };
 
-// export default AudioVisualizer;
+// export default AudioVisualizerWithObject;
