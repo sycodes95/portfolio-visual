@@ -14,6 +14,10 @@ export { default as wrath_tsuruda } from "./Wraith - Tsuruda - SoundLoadMate.com
 export { default as hurricane_isqa } from "./hurricane in 3d - isqa - SoundLoadMate.com (1).mp3";
 export { default as daydreams_gjones } from "./Daydreams - G Jones - SoundLoadMate.com.mp3";
 export { default as whichway_gjones } from "./Which Way - G Jones - SoundLoadMate.com.mp3";
+export { default as humbled_mrcarmack } from "./Mr. Carmack - Humbled - SOULECTION - SoundLoadMate.com.mp3";
+export { default as illbealright_muramasa } from "./i_ll be alright _tonight_ - Mura Masa - SoundLoadMate.com.mp3";
+export { default as areuthere_muramasa } from "./Are U There_ - Mura Masa - SoundLoadMate.com.mp3";
+export { default as ivebeenthinking_borne } from "./PEEKABOO - I_ve Been Thinking _borne Remix_ - borne - SoundLoadMate.com.mp3";
 
 export const immortal_eprom =
   "https://audio.jukehost.co.uk/Yszr2ZqGhoNJNAGTEPFQGB5AtMXCSwjw";

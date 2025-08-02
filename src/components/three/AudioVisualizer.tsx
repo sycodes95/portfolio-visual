@@ -1,86 +1,23 @@
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-
-/* -------------------------------------------------------------------------- */
-/*                                     OLD                                    */
-/* -------------------------------------------------------------------------- */
-
+import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { hush_borne } from "../../assets/mp3s";
-const aud = hush_borne;
+import { weightless_wink } from "../../assets/mp3s";
+
+const aud = weightless_wink;
 // Particle color configuration
 const PARTICLE_COLOR = {
-  r: 1.0, // Red
-  g: 1.0, // Green
-  b: 1.0, // Blue
+  r: 1, // Red
+  g: 1, // Green
+  b: 1, // Blue
   emissive: {
-    r: 1.0,
-    g: 1.0,
-    b: 1.0,
+    r: 1,
+    g: 1,
+    b: 1,
   },
   lights: {
-    color1: { r: 1, g: 1, b: 1 },
-    color2: { r: 1, g: 1, b: 1 },
-    color3: { r: 1, g: 1, b: 1 },
+    color1: { r: 0.8, g: 0.8, b: 1 },
+    color2: { r: 0.8, g: 0.8, b: 1 },
+    color3: { r: 0.8, g: 0.8, b: 1 },
   },
 };
 
@@ -88,19 +25,19 @@ const PARTICLE_COLOR = {
 const BASS_CONFIG = {
   // subBassIntensity: 0.37,
   subBassIntensity: 0.37,
-  lowBassIntensity: 0.5,
-  lowMidIntensity: 0.7,
-  highMidIntensity: 0.8,
-  highIntensity: 0.8,
+  lowBassIntensity: 0.7,
+  lowMidIntensity: 0.8,
+  highMidIntensity: 0.9,
+  highIntensity: 1,
   radiusMultiplier: 15,
-  radiusPower: 20,
+  radiusPower: 8,
   particleScaleMax: 2,
   roundnessMultiplier: 14,
   lightIntensityMultiplier: 6,
   rotationSpeedMax: 40,
   enableColorShift: true,
-  subBassShakeIntensity: 5,
-  subBassRotationIntensity: 10,
+  subBassShakeIntensity: 10,
+  subBassRotationIntensity: 0,
   subBassThreshold: 0.2,
   subBassDecay: 0.05,
   subBassAttack: 5,
@@ -339,6 +276,7 @@ const AudioVisualizer: React.FC = () => {
     rotationArray: Float32Array;
     panArray: Float32Array;
     analyzer?: AudioAnalyzer;
+    centerObj?: THREE.Group; // Add this line
     lights: {
       light1: THREE.PointLight;
       light2: THREE.DirectionalLight;
@@ -396,11 +334,34 @@ const AudioVisualizer: React.FC = () => {
     renderer.setClearColor(0x000000);
     containerRef.current.appendChild(renderer.domElement);
 
-    // Camera controller
     const controls = new CameraController(camera, renderer.domElement);
 
+    const loader = new OBJLoader();
+
+    loader.load(
+      "/assets/objs/femalehead.obj",
+      (object) => {
+        scene.add(object);
+
+        object.position.set(0, -100, 0);
+        object.scale.set(24, 24, 24);
+
+        object.rotation.x = -Math.PI / 2.5;
+
+        if (sceneRef.current) {
+          sceneRef.current.centerObj = object;
+        }
+      },
+      (xhr) => {
+        console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+      },
+      (error) => {
+        console.error("An error happened", error);
+      },
+    );
+
     // Lights
-    const light1 = new THREE.PointLight(0xffffff, 0.25, 1200, 2);
+    const light1 = new THREE.PointLight(0xadd8e6, 0.25, 1200, 2);
     light1.position.set(0, 0, 0);
     light1.color.setRGB(
       PARTICLE_COLOR.lights.color1.r,
@@ -409,7 +370,7 @@ const AudioVisualizer: React.FC = () => {
     );
     scene.add(light1);
 
-    const light2 = new THREE.DirectionalLight(0xffffff, 0.25);
+    const light2 = new THREE.DirectionalLight(0xadd8e6, 0.25);
     light2.position.set(0, 1, 1);
     light2.color.setRGB(
       PARTICLE_COLOR.lights.color2.r,
@@ -418,7 +379,7 @@ const AudioVisualizer: React.FC = () => {
     );
     scene.add(light2);
 
-    const light3 = new THREE.DirectionalLight(0xffffff, 0.25);
+    const light3 = new THREE.DirectionalLight(0xadd8e6, 0.25);
     light3.position.set(0, 1, -1);
     light3.color.setRGB(
       PARTICLE_COLOR.lights.color3.r,
