@@ -20,6 +20,7 @@ export { default as areuthere_muramasa } from "./Are U There_ - Mura Masa - Soun
 export { default as ivebeenthinking_borne } from "./PEEKABOO - I_ve Been Thinking _borne Remix_ - borne - SoundLoadMate.com.mp3";
 export { default as purification_eprom } from "./Purification - Shades_ The Gaslamp Killer - SoundLoadMate.com.mp3";
 export { default as thecircle_eprom } from "./The Circle - Eprom - SoundLoadMate.com.mp3";
+export { default as flusterfuck_isqa } from "./flusterfuck - isqa - SoundLoadMate.com.mp3";
 
 export const immortal_eprom =
   "https://audio.jukehost.co.uk/Yszr2ZqGhoNJNAGTEPFQGB5AtMXCSwjw";

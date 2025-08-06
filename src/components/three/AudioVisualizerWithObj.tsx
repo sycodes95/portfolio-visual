@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { areuthere_muramasa } from "../../assets/mp3s";
-const aud = areuthere_muramasa; // Update this path as needed
+import { areuthere_muramasa, daydreams_gjones, flusterfuck_isqa, hurricane_isqa, hush_borne, separated_oshi, wrath_tsuruda } from "../../assets/mp3s";
+const aud = hush_borne; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -21,12 +21,12 @@ const PARTICLE_COLOR = {
 };
 
 // Bass configuration
-const BASS_CONFIG = {
+export const BASS_CONFIG = {
   subBassIntensity: 0.37,
-  lowBassIntensity: 0.7,
+  lowBassIntensity: 0.4,
   lowMidIntensity: 0.8,
   highMidIntensity: 0.9,
-  highIntensity: 1,
+  highIntensity: 0.7,
   radiusMultiplier: 15,
   radiusPower: 14,
   particleScaleMax: 2,
@@ -42,7 +42,7 @@ const BASS_CONFIG = {
 };
 
 // Chromatic Aberration Configuration
-const CHROMATIC_CONFIG = {
+export const CHROMATIC_CONFIG = {
   modes: {
     SUBTLE: { max: 0.002, speed: 0.1, decay: 0.92 },
     NORMAL: { max: 0.005, speed: 0.3, decay: 0.88 },
@@ -200,7 +200,7 @@ class CameraController {
 // Audio Analyzer
 class AudioAnalyzer {
   constructor(binCount = 1024, smoothingTimeConstant = 0.85) {
-    this.context = new (window.AudioContext || window.webkitAudioContext)();
+    this.context = new window.AudioContext();
     this.analyzerNode = this.context.createAnalyser();
     this.analyzerNodeLeft = this.context.createAnalyser();
     this.analyzerNodeRight = this.context.createAnalyser();
@@ -982,10 +982,11 @@ const AudioVisualizerWithObject = () => {
         // Calculate frequency bands
         const sampleRate = 44100;
         const binHz = sampleRate / (sceneRef.current.analyzer.binCount * 2);
-        const subBassEnd = Math.floor(60 / binHz);
-        const lowBassEnd = Math.floor(400 / binHz);
-        const lowMidEnd = Math.floor(1500 / binHz);
-        const highMidEnd = Math.floor(3000 / binHz);
+
+        const subBassEnd = Math.floor(150 / binHz);
+        const lowBassEnd = Math.floor(300 / binHz);
+        const lowMidEnd = Math.floor(2000 / binHz);
+        const highMidEnd = Math.floor(4000 / binHz);
 
         // Calculate averages for each band
         let subBassTotal = 0,
@@ -1023,6 +1024,7 @@ const AudioVisualizerWithObject = () => {
         let lowBassAvg =
           (lowBassTotal / Math.max(1, lowBassEnd - subBassEnd) / 255) *
           BASS_CONFIG.lowBassIntensity;
+
         let lowBassLeftAvg =
           lowBassLeft / Math.max(1, lowBassEnd - subBassEnd) / 255;
         let lowBassRightAvg =
@@ -1113,7 +1115,7 @@ const AudioVisualizerWithObject = () => {
           targetMode = "GLITCH";
         } else if (subBassAvg > 0.9) {
           targetMode = "GLITCH";
-        } else if (subBassAvg > 0.5) {
+        } else if (subBassAvg > 0.7) {
           targetMode = "INTENSE";
         } else if (overallEnergy > 0.6) {
           targetMode = "NORMAL";
@@ -1366,7 +1368,7 @@ const AudioVisualizerWithObject = () => {
                     shakeArray[pathIndex * 3 + 1] *= 1.5;
                     shakeArray[pathIndex * 3 + 2] *= 1.5;
                   }
-                } else if (progressAlongPath < lowBassThreshold) {
+                } else if (progressAlongPath < lowBassThreshold && lowBassAvg > 0.03) {
                   panArray[pathIndex] = lowBassPan * lowBassAvg;
                 } else if (progressAlongPath < lowMidThreshold) {
                   panArray[pathIndex] = lowMidPan * lowMidAvg;
@@ -1392,19 +1394,23 @@ const AudioVisualizerWithObject = () => {
             baseRadius += (Math.random() - 0.5) * 2;
             const pathProgress = i / (pathLength - 1);
             if (pathProgress <= 0.2) {
-              baseRadius += subBassAvg * subBassAvg * 120;
+              baseRadius += subBassAvg * 120;
               if (isBassHit && Math.random() > 0.6) {
                 baseRadius *= BASS_CONFIG.subBassAttack;
               }
-            }
+            } else if (pathProgress <= 0.4) {
+              baseRadius += lowBassAvg * 100;
+						}
             radiusArray[i] = Math.max(1, baseRadius);
           } else {
             const pathProgress = i / (pathLength - 1);
             let sectionAvg = 0;
             if (pathProgress <= 0.2) {
               sectionAvg = subBassAvg;
+							console.log("sub path progress");
             } else if (pathProgress <= 0.4) {
               sectionAvg = lowBassAvg;
+							console.log("low bass path progresss")
             } else if (pathProgress <= 0.6) {
               sectionAvg = lowMidAvg;
             } else if (pathProgress <= 0.8) {
