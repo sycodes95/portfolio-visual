@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { areuthere_muramasa, daydreams_gjones, flusterfuck_isqa, hurricane_isqa, hush_borne, separated_oshi, wrath_tsuruda } from "../../assets/mp3s";
-const aud = hush_borne; // Update this path as needed
+import { areuthere_muramasa, daydreams_gjones, flusterfuck_isqa, hurricane_isqa, hush_borne, separated_oshi, weightless_wink, wrath_tsuruda } from "../../assets/mp3s";
+const aud = weightless_wink; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -1393,22 +1393,22 @@ const AudioVisualizerWithObject = () => {
               BASS_CONFIG.radiusMultiplier;
             baseRadius += (Math.random() - 0.5) * 2;
             const pathProgress = i / (pathLength - 1);
-            if (pathProgress <= 0.2) {
+            if (pathProgress <= 0.1) {
               baseRadius += subBassAvg * 120;
               if (isBassHit && Math.random() > 0.6) {
                 baseRadius *= BASS_CONFIG.subBassAttack;
               }
-            } else if (pathProgress <= 0.4) {
+            } else if (pathProgress <= 0.2) {
               baseRadius += lowBassAvg * 100;
 						}
             radiusArray[i] = Math.max(1, baseRadius);
           } else {
             const pathProgress = i / (pathLength - 1);
             let sectionAvg = 0;
-            if (pathProgress <= 0.2) {
+            if (pathProgress <= 0.1) {
               sectionAvg = subBassAvg;
 							console.log("sub path progress");
-            } else if (pathProgress <= 0.4) {
+            } else if (pathProgress <= 0.2) {
               sectionAvg = lowBassAvg;
 							console.log("low bass path progresss")
             } else if (pathProgress <= 0.6) {
