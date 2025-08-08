@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { areuthere_muramasa } from "../../assets/mp3s";
-const aud = areuthere_muramasa; // Update this path as needed
+import { areuthere_muramasa, hurricane_isqa, weightless_wink } from "../../assets/mp3s";
+const aud = hurricane_isqa; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
