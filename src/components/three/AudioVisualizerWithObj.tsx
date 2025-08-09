@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { theduo_atu } from "../../assets/mp3s";
-const aud = theduo_atu; // Update this path as needed
+import { thecircle_eprom } from "../../assets/mp3s";
+const aud = thecircle_eprom; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -28,13 +28,13 @@ const BASS_CONFIG = {
   highMidIntensity: 0.9,
   highIntensity: 1,
   radiusMultiplier: 15,
-  radiusPower: 14,
-  particleScaleMax: 2,
-  roundnessMultiplier: 17,
+  radiusPower: 22,
+  particleScaleMax: 3,
+  roundnessMultiplier: 25,
   lightIntensityMultiplier: 6,
   rotationSpeedMax: 33,
   enableColorShift: true,
-  subBassShakeIntensity: 10,
+  subBassShakeIntensity: 20,
   subBassRotationIntensity: 10,
   subBassThreshold: 0.2,
   subBassDecay: 0.05,
