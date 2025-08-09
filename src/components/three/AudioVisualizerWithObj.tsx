@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { thecircle_eprom } from "../../assets/mp3s";
-const aud = thecircle_eprom; // Update this path as needed
+import { lost_stwo } from "../../assets/mp3s";
+const aud = lost_stwo; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -9,9 +9,9 @@ const PARTICLE_COLOR = {
   g: 1,
   b: 1,
   emissive: {
-    r: 1,
-    g: 1,
-    b: 1,
+    r: 0.85,
+    g: 0.85,
+    b: 0.85,
   },
   lights: {
     color1: { r: 0.8, g: 0.8, b: 1 },
@@ -21,6 +21,26 @@ const PARTICLE_COLOR = {
 };
 
 // Bass configuration
+// const BASS_CONFIG = {
+//   subBassIntensity: 0.4,
+//   lowBassIntensity: 0.7,
+//   lowMidIntensity: 0.8,
+//   highMidIntensity: 0.9,
+//   highIntensity: 1,
+//   radiusMultiplier: 15,
+//   radiusPower: 22,
+//   particleScaleMax: 3,
+//   roundnessMultiplier: 25,
+//   lightIntensityMultiplier: 6,
+//   rotationSpeedMax: 33,
+//   enableColorShift: true,
+//   subBassShakeIntensity: 20,
+//   subBassRotationIntensity: 10,
+//   subBassThreshold: 0.2,
+//   subBassDecay: 0.05,
+//   subBassAttack: 5,
+// };
+// test lowbass
 const BASS_CONFIG = {
   subBassIntensity: 0.4,
   lowBassIntensity: 0.7,
@@ -28,6 +48,7 @@ const BASS_CONFIG = {
   highMidIntensity: 0.9,
   highIntensity: 1,
   radiusMultiplier: 15,
+  // radiusPower: 22,
   radiusPower: 22,
   particleScaleMax: 3,
   roundnessMultiplier: 25,
@@ -982,7 +1003,7 @@ const AudioVisualizerWithObject = () => {
         // Calculate frequency bands
         const sampleRate = 44100;
         const binHz = sampleRate / (sceneRef.current.analyzer.binCount * 2);
-        const subBassEnd = Math.floor(60 / binHz);
+        const subBassEnd = Math.floor(250 / binHz);
         const lowBassEnd = Math.floor(400 / binHz);
         const lowMidEnd = Math.floor(1500 / binHz);
         const highMidEnd = Math.floor(3000 / binHz);

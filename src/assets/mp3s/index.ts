@@ -26,6 +26,8 @@ export { default as missingyou_atu } from "./_missing you_ _ft. Dpat_ - atu - So
 
 export { default as wayifeel_atu } from "./Atu - Way I Feel _Pictures on Silence - OUT NOW_ - SOULECTION - SoundLoadMate.com.mp3";
 export { default as theduo_atu } from "./Atu - _the duo_ ft. Sango _Pictures on Silence - OUT NOW_ - SOULECTION - SoundLoadMate.com.mp3";
+export { default as twilight_ozi } from "./Twilight - OZI - SoundLoadMate.com.mp3";
+export { default as lost_stwo } from "./Lido - Lost feat. Muri _Stwo Remix_ - stwo - SoundLoadMate.com.mp3";
 export const immortal_eprom =
   "https://audio.jukehost.co.uk/Yszr2ZqGhoNJNAGTEPFQGB5AtMXCSwjw";
 export const thecorruption_eprom =
