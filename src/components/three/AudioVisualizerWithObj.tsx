@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { lost_stwo } from "../../assets/mp3s";
-const aud = lost_stwo; // Update this path as needed
+import { asteroids_prolix } from "../../assets/mp3s";
+const aud = asteroids_prolix; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -47,16 +47,16 @@ const BASS_CONFIG = {
   lowMidIntensity: 0.8,
   highMidIntensity: 0.9,
   highIntensity: 1,
-  radiusMultiplier: 15,
+  radiusMultiplier: 12,
   // radiusPower: 22,
   radiusPower: 22,
   particleScaleMax: 3,
-  roundnessMultiplier: 25,
+  roundnessMultiplier: 19,
   lightIntensityMultiplier: 6,
   rotationSpeedMax: 33,
   enableColorShift: true,
-  subBassShakeIntensity: 20,
-  subBassRotationIntensity: 10,
+  subBassShakeIntensity: 10,
+  subBassRotationIntensity: 20,
   subBassThreshold: 0.2,
   subBassDecay: 0.05,
   subBassAttack: 5,

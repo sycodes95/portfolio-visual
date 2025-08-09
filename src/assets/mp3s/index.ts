@@ -28,6 +28,12 @@ export { default as wayifeel_atu } from "./Atu - Way I Feel _Pictures on Silence
 export { default as theduo_atu } from "./Atu - _the duo_ ft. Sango _Pictures on Silence - OUT NOW_ - SOULECTION - SoundLoadMate.com.mp3";
 export { default as twilight_ozi } from "./Twilight - OZI - SoundLoadMate.com.mp3";
 export { default as lost_stwo } from "./Lido - Lost feat. Muri _Stwo Remix_ - stwo - SoundLoadMate.com.mp3";
+export { default as ybn_yojas } from "./ybn. - yojas. - SoundLoadMate.com.mp3";
+export { default as fuckyou_yojas } from "./uoykcuf - yojas. - SoundLoadMate.com.mp3";
+export { default as isamplethings } from "./I SaMpLE ThINgS _ It SoUNdS LIkE ThIS...... - Frank. - SoundLoadMate.com.mp3";
+export { default as shift_imanu } from "./Shift _w. Noisia_ - IMANU_ Noisia - SoundLoadMate.com.mp3";
+export { default as asteroids_prolix } from "./Asteroids _with Prolix_ _Noisia Remix_ - Noisia_ Prolix - SoundLoadMate.com.mp3";
+
 export const immortal_eprom =
   "https://audio.jukehost.co.uk/Yszr2ZqGhoNJNAGTEPFQGB5AtMXCSwjw";
 export const thecorruption_eprom =
