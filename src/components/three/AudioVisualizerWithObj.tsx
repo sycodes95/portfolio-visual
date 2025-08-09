@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { areuthere_muramasa } from "../../assets/mp3s";
-const aud = areuthere_muramasa; // Update this path as needed
+import { theduo_atu } from "../../assets/mp3s";
+const aud = theduo_atu; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -22,7 +22,7 @@ const PARTICLE_COLOR = {
 
 // Bass configuration
 const BASS_CONFIG = {
-  subBassIntensity: 0.37,
+  subBassIntensity: 0.4,
   lowBassIntensity: 0.7,
   lowMidIntensity: 0.8,
   highMidIntensity: 0.9,
@@ -35,7 +35,7 @@ const BASS_CONFIG = {
   rotationSpeedMax: 33,
   enableColorShift: true,
   subBassShakeIntensity: 10,
-  subBassRotationIntensity: 0,
+  subBassRotationIntensity: 10,
   subBassThreshold: 0.2,
   subBassDecay: 0.05,
   subBassAttack: 5,

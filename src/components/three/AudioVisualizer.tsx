@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { weightless_wink } from "../../assets/mp3s";
+import { missingyou_atu } from "../../assets/mp3s";
 
-const aud = weightless_wink; // Update this path as needed
+const aud = missingyou_atu; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
