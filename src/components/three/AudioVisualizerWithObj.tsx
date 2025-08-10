@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { lost_stwo } from "../../assets/mp3s";
-const aud = lost_stwo; // Update this path as needed
+import { levels_loj } from "../../assets/mp3s";
+const aud = levels_loj; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -1215,6 +1215,7 @@ const AudioVisualizerWithObject = () => {
           targetMode = "SUBTLE";
         }
         anim.chromaticMode = targetMode;
+
 
         // Calculate target chromatic strength
         const modeConfig = CHROMATIC_CONFIG.modes[targetMode];
