@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { levels_loj } from "../../assets/mp3s";
-const aud = levels_loj; // Update this path as needed
+import { whydidyou_isqa } from "../../assets/mp3s";
+const aud = whydidyou_isqa; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -49,9 +49,9 @@ const BASS_CONFIG = {
   highIntensity: 1,
   radiusMultiplier: 15,
   // radiusPower: 22,
-  radiusPower: 22,
-  particleScaleMax: 3,
-  roundnessMultiplier: 19,
+  radiusPower: 14,
+  particleScaleMax: 4,
+  roundnessMultiplier: 22,
   lightIntensityMultiplier: 6,
   rotationSpeedMax: 33,
   enableColorShift: true,
@@ -68,7 +68,7 @@ const CHROMATIC_CONFIG = {
     SUBTLE: { max: 0.002, speed: 0.1, decay: 0.92 },
     NORMAL: { max: 0.005, speed: 0.3, decay: 0.88 },
     INTENSE: { max: 0.015, speed: 0.5, decay: 0.85 },
-    GLITCH: { max: 0.03, speed: 0.8, decay: 0.8 },
+    GLITCH: { max: 0.025, speed: 0.5, decay: 0.9 },
   },
   bassHitMultiplier: 1.5, // Reduced from 3.0 to prevent extreme flashes
   edgeStrength: 3,
@@ -471,6 +471,7 @@ const AudioVisualizerWithObject = () => {
           vec3 color = vec3(r, g, b);
           float lum = dot(color, vec3(0.299, 0.587, 0.114));
           color = mix(color, vec3(lum), totalStrength * 0.1);
+          
           
           gl_FragColor = vec4(color, 1.0);
         }
@@ -1215,7 +1216,6 @@ const AudioVisualizerWithObject = () => {
           targetMode = "SUBTLE";
         }
         anim.chromaticMode = targetMode;
-
 
         // Calculate target chromatic strength
         const modeConfig = CHROMATIC_CONFIG.modes[targetMode];
