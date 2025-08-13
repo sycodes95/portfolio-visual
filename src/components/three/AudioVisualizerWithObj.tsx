@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { fuckyou_yojas } from "../../assets/mp3s";
-const aud = fuckyou_yojas; // Update this path as needed
+import { antidote_tsuruda, areuthere_muramasa, asteroids_prolix, bluelights_ramzoid, camelblues_mndsgn, everglademarch_ofthetrees, flusterfuck_isqa, fuckyou_yojas, geyron_eprom, holdmedown_borne, hush_borne, levels_loj, lost_stwo, power_loj, twilight_ozi, weightless_wink, whydidyou_isqa, ybn_yojas } from "../../assets/mp3s";
+const aud = twilight_ozi; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -356,7 +356,9 @@ const AudioVisualizerWithObject = () => {
     // Color inversion state
     colorInversionProgress: 0,
     colorInversionTarget: 0,
-    lastColorInversionTime: 0,
+    persistentInversion: 0,
+    tempInversionActive: false,
+    tempInversionStart: 0,
   });
 
   useEffect(() => {
@@ -1024,6 +1026,7 @@ const AudioVisualizerWithObject = () => {
 
     // Animation loop
     let frameCount = 0;
+
     const animate = () => {
       frameId.current = requestAnimationFrame(animate);
 
@@ -1068,11 +1071,16 @@ const AudioVisualizerWithObject = () => {
       anim.chromaticPulsePhase += CHROMATIC_CONFIG.pulseSpeed * deltaTime;
 
       // Update color inversion with 50ms transition
-      const colorInversionAge = anim.time - anim.lastColorInversionTime;
-      if (colorInversionAge > 0.05) {
-        // After 50ms, start fading back to normal
-        anim.colorInversionTarget = 0.0;
+      let target = anim.persistentInversion;
+      if (anim.tempInversionActive) {
+        const tempAge = anim.time - anim.tempInversionStart;
+        if (tempAge > 0.05) {
+          anim.tempInversionActive = false;
+        } else {
+          target = 1 - anim.persistentInversion;
+        }
       }
+      anim.colorInversionTarget = target;
       // Smooth transition for color inversion
       const inversionSmoothingRate = deltaTime * 20.0; // 50ms transition
       anim.colorInversionProgress +=
@@ -1213,9 +1221,14 @@ const AudioVisualizerWithObject = () => {
           now - subBassPeakTime > 150
         ) {
           isBassHit = true;
-          // Trigger color inversion on bass hit
-          anim.colorInversionTarget = 1.0;
-          anim.lastColorInversionTime = anim.time;
+          animState.current.subBassPeakTime = now;
+          const isTemp = Math.random() < 0.5;
+          if (isTemp) {
+            anim.tempInversionActive = true;
+            anim.tempInversionStart = anim.time;
+          } else {
+            anim.persistentInversion = 1 - anim.persistentInversion;
+          }
         }
 
         anim.previousBassAvg = subBassAvg;
@@ -1884,7 +1897,8 @@ const AudioVisualizerWithObject = () => {
         // Reset color inversion when not playing
         anim.colorInversionProgress *= 0.9;
         anim.colorInversionTarget = 0;
-        renderer.setClearColor(new THREE.Color(0, 0, 0));
+        anim.persistentInversion = 0;
+        anim.tempInversionActive = false;
 
         // Fade out shooting stars when not playing
         anim.headFormationProgress = 0;
