@@ -36,6 +36,8 @@ export { default as asteroids_prolix } from "./Asteroids _with Prolix_ _Noisia R
 export { default as everglademarch_ofthetrees } from "./Everglade March - Of The Trees - SoundLoadMate.com.mp3";
 export { default as whydidyou_isqa } from "./why did you - isqa - SoundLoadMate.com.mp3";
 export { default as slowdancinginthedark_jkuch } from "./Slow Dancing In The Dark - JKuch - SoundLoadMate.com.mp3";
+export { default as antidote_tsuruda } from "./Antidote - tsuruda - SoundLoadMate.com.mp3";
+
 export const immortal_eprom =
   "https://audio.jukehost.co.uk/Yszr2ZqGhoNJNAGTEPFQGB5AtMXCSwjw";
 export const thecorruption_eprom =

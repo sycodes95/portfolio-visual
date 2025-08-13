@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { hush_borne } from "../../assets/mp3s";
-const aud = hush_borne; // Update this path as needed
+import { fuckyou_yojas } from "../../assets/mp3s";
+const aud = fuckyou_yojas; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -1067,14 +1067,14 @@ const AudioVisualizerWithObject = () => {
       anim.chromaticWavePhase += CHROMATIC_CONFIG.waveSpeed * deltaTime;
       anim.chromaticPulsePhase += CHROMATIC_CONFIG.pulseSpeed * deltaTime;
 
-      // Update color inversion with 75ms transition
+      // Update color inversion with 50ms transition
       const colorInversionAge = anim.time - anim.lastColorInversionTime;
-      if (colorInversionAge > 0.075) {
-        // After 75ms, start fading back to normal
+      if (colorInversionAge > 0.05) {
+        // After 50ms, start fading back to normal
         anim.colorInversionTarget = 0.0;
       }
       // Smooth transition for color inversion
-      const inversionSmoothingRate = deltaTime * 13.33; // 75ms transition
+      const inversionSmoothingRate = deltaTime * 20.0; // 50ms transition
       anim.colorInversionProgress +=
         (anim.colorInversionTarget - anim.colorInversionProgress) *
         inversionSmoothingRate;
