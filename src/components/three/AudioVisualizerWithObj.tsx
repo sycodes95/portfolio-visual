@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { asteroids_prolix } from "../../assets/mp3s";
-const aud = asteroids_prolix; // Update this path as needed
+import { hush_borne } from "../../assets/mp3s";
+const aud = hush_borne; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -353,6 +353,10 @@ const AudioVisualizerWithObject = () => {
     chromaticTracer: 0,
     chromaticTracerStartTime: 0,
     chromaticTracerActive: false,
+    // Color inversion state
+    colorInversionProgress: 0,
+    colorInversionTarget: 0,
+    lastColorInversionTime: 0,
   });
 
   useEffect(() => {
@@ -881,7 +885,7 @@ const AudioVisualizerWithObject = () => {
         }
       `;
 
-        // Fragment shader (same as original)
+        // Fragment shader with color inversion support
         const fragmentShader = `
         uniform vec3 uEmissive;
         uniform vec3 uLightPos1;
@@ -893,6 +897,7 @@ const AudioVisualizerWithObject = () => {
         uniform float uLightIntensity1;
         uniform float uLightIntensity2;
         uniform float uLightIntensity3;
+        uniform float uColorInversion;
 
         varying vec3 vColor;
         varying vec3 vNormal;
@@ -917,6 +922,10 @@ const AudioVisualizerWithObject = () => {
           finalColor += vColor * uLightColor3 * diff3 * uLightIntensity3;
 
           finalColor += vColor * 0.1;
+
+          // Apply color inversion based on uniform
+          vec3 invertedColor = vec3(1.0) - finalColor;
+          finalColor = mix(finalColor, invertedColor, uColorInversion);
 
           gl_FragColor = vec4(finalColor, 1.0);
         }
@@ -967,6 +976,7 @@ const AudioVisualizerWithObject = () => {
             uLightIntensity1: { value: 0.25 },
             uLightIntensity2: { value: 0.25 },
             uLightIntensity3: { value: 0.25 },
+            uColorInversion: { value: 0.0 },
           },
           vertexShader,
           fragmentShader,
@@ -1056,6 +1066,22 @@ const AudioVisualizerWithObject = () => {
       // Update chromatic aberration wave and pulse phases
       anim.chromaticWavePhase += CHROMATIC_CONFIG.waveSpeed * deltaTime;
       anim.chromaticPulsePhase += CHROMATIC_CONFIG.pulseSpeed * deltaTime;
+
+      // Update color inversion with 75ms transition
+      const colorInversionAge = anim.time - anim.lastColorInversionTime;
+      if (colorInversionAge > 0.075) {
+        // After 75ms, start fading back to normal
+        anim.colorInversionTarget = 0.0;
+      }
+      // Smooth transition for color inversion
+      const inversionSmoothingRate = deltaTime * 13.33; // 75ms transition
+      anim.colorInversionProgress +=
+        (anim.colorInversionTarget - anim.colorInversionProgress) *
+        inversionSmoothingRate;
+
+      // Update background color based on inversion
+      const bgColor = anim.colorInversionProgress;
+      renderer.setClearColor(new THREE.Color(bgColor, bgColor, bgColor));
 
       // Audio processing (same as original)
       if (
@@ -1187,6 +1213,9 @@ const AudioVisualizerWithObject = () => {
           now - subBassPeakTime > 150
         ) {
           isBassHit = true;
+          // Trigger color inversion on bass hit
+          anim.colorInversionTarget = 1.0;
+          anim.lastColorInversionTime = anim.time;
         }
 
         anim.previousBassAvg = subBassAvg;
@@ -1675,6 +1704,8 @@ const AudioVisualizerWithObject = () => {
 
           particles.material.uniforms.uParticleScale.value =
             anim.currentParticleScale;
+          particles.material.uniforms.uColorInversion.value =
+            anim.colorInversionProgress;
           particles.material.uniforms.uPath.value = pathPositions;
           particles.material.uniforms.uRadius.value = radiusArray;
           particles.material.uniforms.uShake.value = shakeArray;
@@ -1849,6 +1880,11 @@ const AudioVisualizerWithObject = () => {
 
         // Decay chromatic aberration when not playing
         anim.chromaticStrength *= 0.95;
+
+        // Reset color inversion when not playing
+        anim.colorInversionProgress *= 0.9;
+        anim.colorInversionTarget = 0;
+        renderer.setClearColor(new THREE.Color(0, 0, 0));
 
         // Fade out shooting stars when not playing
         anim.headFormationProgress = 0;
