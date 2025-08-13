@@ -46,3 +46,4 @@ export const phonemegothik_eprom =
   "https://audio.jukehost.co.uk/ITSU2gQK1IVmDorLaKd9gU2fRk6RqzdJ";
 export const stephanie_danielallen =
   " https://audio.jukehost.co.uk/oyBXOCQB1qnYjGJq9pJqiI1e0QV3Xego";
+// Massive spike on bass hit

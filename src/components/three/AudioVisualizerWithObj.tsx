@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { whydidyou_isqa } from "../../assets/mp3s";
-const aud = whydidyou_isqa; // Update this path as needed
+import { asteroids_prolix } from "../../assets/mp3s";
+const aud = asteroids_prolix; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -68,9 +68,9 @@ const CHROMATIC_CONFIG = {
     SUBTLE: { max: 0.002, speed: 0.1, decay: 0.92 },
     NORMAL: { max: 0.005, speed: 0.3, decay: 0.88 },
     INTENSE: { max: 0.015, speed: 0.5, decay: 0.85 },
-    GLITCH: { max: 0.025, speed: 0.5, decay: 0.9 },
+    GLITCH: { max: 0.015, speed: 0.5, decay: 0.85 },
   },
-  bassHitMultiplier: 1.5, // Reduced from 3.0 to prevent extreme flashes
+  bassHitMultiplier: 1.2, // Reduced from 3.0 to prevent extreme flashes
   edgeStrength: 3,
   distanceStrength: 2,
   panInfluence: 0.5,
@@ -1223,7 +1223,9 @@ const AudioVisualizerWithObject = () => {
 
         if (isBassHit) {
           // Massive spike on bass hit
-          targetStrength = modeConfig.max * CHROMATIC_CONFIG.bassHitMultiplier;
+          console.log("BASSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS");
+          targetStrength =
+            (modeConfig.max * CHROMATIC_CONFIG.bassHitMultiplier) / 2;
         } else {
           // Base strength from sub-bass
           targetStrength = subBassAvg * modeConfig.max;
