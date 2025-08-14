@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { antidote_tsuruda, asteroids_prolix, bluelights_ramzoid, fuckyou_yojas, geyron_eprom, hard_sophie, hush_borne, levels_loj, twilight_ozi, wrath_tsuruda, ybn_yojas } from "../../assets/mp3s";
-const aud = levels_loj; // Update this path as needed
+import { antidote_tsuruda, asteroids_prolix, basscannon_lyny, bluelights_ramzoid, fuckyou_yojas, geyron_eprom, hard_sophie, honey_medasin, humbled_mrcarmack, hush_borne, levels_loj, missingyou_atu, nobody_lyny, power_loj, section_lyny, thecircle_eprom, twilight_ozi, weightless_wink, wrath_tsuruda, ybn_yojas } from "../../assets/mp3s";
+const aud = section_lyny; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -51,12 +51,12 @@ const BASS_CONFIG = {
   // radiusPower: 22,
   radiusPower: 14,
   particleScaleMax: 4,
-  roundnessMultiplier: 22,
-  lightIntensityMultiplier: 6,
+  roundnessMultiplier: 25,
+  lightIntensityMultiplier: 10,
   rotationSpeedMax: 33,
   enableColorShift: true,
   subBassShakeIntensity: 10,
-  subBassRotationIntensity: 20,
+  subBassRotationIntensity: 25,
   subBassThreshold: 0.2,
   subBassDecay: 0.05,
   subBassAttack: 5,
@@ -86,7 +86,7 @@ const SHOOTING_STAR_CONFIG = {
   combinedThreshold: 0.6, // Combined threshold for activation
   maxActiveStars: 2000, // Maximum number of active shooting stars
   starLength: 25, // Length of each shooting star trail
-  starWidth: 0.5, // Width of shooting star
+  starWidth: 2, // Width of shooting star
   starSpeed: 4000, // Speed of shooting star (units per second)
   starLifetime: 0.2, // Lifetime of each star in seconds
   baseOpacity: 1, // Starting opacity of shooting star
@@ -613,8 +613,8 @@ const AudioVisualizerWithObject = () => {
         console.log("OBJ loaded, creating particle system...");
 
         // Transform and scale vertices
-        const headScale = 15;
-        const headOffsetY = 350;
+        const headScale = 20;
+        const headOffsetY = 600;
         const headRotationX = -Math.PI / 2.5 + (-15 * Math.PI) / 180;
 
         // Sample points from the head surface
