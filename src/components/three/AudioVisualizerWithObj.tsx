@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { antidote_tsuruda, areuthere_muramasa, asteroids_prolix, bluelights_ramzoid, camelblues_mndsgn, everglademarch_ofthetrees, flusterfuck_isqa, fuckyou_yojas, geyron_eprom, holdmedown_borne, hush_borne, levels_loj, lost_stwo, power_loj, twilight_ozi, weightless_wink, whydidyou_isqa, ybn_yojas } from "../../assets/mp3s";
-const aud = twilight_ozi; // Update this path as needed
+import { antidote_tsuruda, asteroids_prolix, bluelights_ramzoid, fuckyou_yojas, geyron_eprom, hard_sophie, hush_borne, levels_loj, twilight_ozi, wrath_tsuruda, ybn_yojas } from "../../assets/mp3s";
+const aud = levels_loj; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -154,7 +154,8 @@ class CameraController {
     this.domElement = domElement;
     this.autoRotate = true;
     this.autoRotateSpeed = 0.1;
-    this.rotationY = 0;
+    this.azimuthalAngle = 0;
+    this.polarAngle = Math.PI / 2;
     this.targetDistance = 2000;
     this.distance = 2000;
     this.isDragging = false;
@@ -193,7 +194,9 @@ class CameraController {
     if (!this.isDragging) return;
     const deltaX = e.clientX - this.previousMouseX;
     const deltaY = e.clientY - this.previousMouseY;
-    this.rotationY -= deltaX * 0.01;
+    this.azimuthalAngle -= deltaX * 0.01;
+    this.polarAngle -= deltaY * 0.01;
+    this.polarAngle = Math.max(this.minPolarAngle, Math.min(this.maxPolarAngle, this.polarAngle));
     this.previousMouseX = e.clientX;
     this.previousMouseY = e.clientY;
   }
@@ -208,14 +211,18 @@ class CameraController {
     this.lastTime = currentTime;
 
     if (this.autoRotate && !this.isDragging) {
-      this.rotationY += this.autoRotateSpeed * deltaTime * 0.3;
+      this.azimuthalAngle += this.autoRotateSpeed * deltaTime * 0.3;
+    }
+
+    if (!this.isDragging) {
+      this.polarAngle += (Math.PI / 2 - this.polarAngle) * 0.1;
     }
 
     this.distance += (this.targetDistance - this.distance) * 0.05;
 
-    this.camera.position.x = Math.sin(this.rotationY) * this.distance;
-    this.camera.position.z = Math.cos(this.rotationY) * this.distance;
-    this.camera.position.y = 0;
+    this.camera.position.x = this.distance * Math.sin(this.polarAngle) * Math.sin(this.azimuthalAngle);
+    this.camera.position.y = this.distance * Math.cos(this.polarAngle);
+    this.camera.position.z = this.distance * Math.sin(this.polarAngle) * Math.cos(this.azimuthalAngle);
     this.camera.lookAt(0, 0, 0);
   }
 
