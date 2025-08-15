@@ -780,6 +780,11 @@ const AudioVisualizer = () => {
       frequencyResponse: 0,
       baseScale: 1.0,
       expansionScale: 1.0,
+      bassScale: 1.0,
+      bassScaleDecay: 0.95,
+      verticalRotation: 0,
+      verticalRotationSpeed: 0,
+      baseVerticalRotationSpeed: 0.008,
     };
     rotatingGeometries.push(sphere);
 
@@ -796,11 +801,16 @@ const AudioVisualizer = () => {
       scale: 1.0,
       orbitRadius: 600,
       orbitAngle: (Math.PI * 2) / 3,
-      orbitSpeed: 0.008,
+      orbitSpeed: 0.01,
       pathProgress: 0.5,
       frequencyResponse: 0,
       baseScale: 1.0,
       expansionScale: 1.0,
+      bassScale: 1.0,
+      bassScaleDecay: 0.95,
+      verticalRotation: 0,
+      verticalRotationSpeed: 0,
+      baseVerticalRotationSpeed: 0.006,
     };
     rotatingGeometries.push(cube);
 
@@ -817,11 +827,16 @@ const AudioVisualizer = () => {
       scale: 1.0,
       orbitRadius: 750,
       orbitAngle: (Math.PI * 4) / 3,
-      orbitSpeed: 0.012,
+      orbitSpeed: 0.01,
       pathProgress: 0.8,
       frequencyResponse: 0,
       baseScale: 1.0,
       expansionScale: 1.0,
+      bassScale: 1.0,
+      bassScaleDecay: 0.95,
+      verticalRotation: 0,
+      verticalRotationSpeed: 0,
+      baseVerticalRotationSpeed: 0.004,
     };
     rotatingGeometries.push(pyramid);
 
@@ -2087,7 +2102,24 @@ const AudioVisualizer = () => {
             }
           });
         }
-
+        /* -------------------------------------------------------------------------- */
+        /*                                   SHAPES                                   */
+        /* -------------------------------------------------------------------------- */
+        /* -------------------------------------------------------------------------- */
+        /*                                   SHAPES                                   */
+        /* -------------------------------------------------------------------------- */
+        /* -------------------------------------------------------------------------- */
+        /*                                   SHAPES                                   */
+        /* -------------------------------------------------------------------------- */
+        /* -------------------------------------------------------------------------- */
+        /*                                   SHAPES                                   */
+        /* -------------------------------------------------------------------------- */
+        /* -------------------------------------------------------------------------- */
+        /*                                   SHAPES                                   */
+        /* -------------------------------------------------------------------------- */
+        /* -------------------------------------------------------------------------- */
+        /*                                   SHAPES                                   */
+        /* -------------------------------------------------------------------------- */
         // Update particle-based rotating geometries with counter-rotation and expansion
         if (sceneRef.current.rotatingGeometries) {
           // Get camera rotation for counter-rotation
@@ -2108,8 +2140,16 @@ const AudioVisualizer = () => {
             geom.expansionScale +=
               (targetExpansion - geom.expansionScale) * 0.2;
 
-            // Apply expansion to the particle group
-            geom.mesh.scale.setScalar(geom.expansionScale);
+            // Bass-reactive scaling with decay
+            if (isBassHit) {
+              geom.bassScale = Math.max(geom.bassScale, 1.0 + subBassAvg * 2.5);
+            }
+            geom.bassScale *= geom.bassScaleDecay;
+            geom.bassScale = Math.max(geom.bassScale, 1.0);
+
+            // Combine expansion and bass scaling
+            const combinedScale = geom.expansionScale * geom.bassScale;
+            geom.mesh.scale.setScalar(combinedScale);
 
             // Counter-rotate against camera rotation
             const counterRotationSpeed = controls.autoRotateSpeed * 0.02; // Counter to camera auto-rotation
@@ -2125,30 +2165,55 @@ const AudioVisualizer = () => {
 
             // Add extra rotation on bass hits
             if (isBassHit) {
-              geom.currentRotationSpeed *= 2.0;
+              geom.currentRotationSpeed *= 1.5;
             }
 
             // Rotate the geometry counter to camera + its own rotation
-            geom.mesh.rotation.x += geom.currentRotationSpeed * deltaTime * 60;
+            geom.mesh.rotation.x += geom.currentRotationSpeed * deltaTime * 5;
+            2;
             geom.mesh.rotation.y +=
               (geom.currentRotationSpeed - counterRotationSpeed) *
               deltaTime *
-              60;
-            geom.mesh.rotation.z += geom.currentRotationSpeed * deltaTime * 30;
+              2;
+            geom.mesh.rotation.z += geom.currentRotationSpeed * deltaTime;
+
+            // Vertical rotation that gradually shifts and speeds up with frequency hits
+            geom.verticalRotationSpeed = geom.baseVerticalRotationSpeed;
+
+            // Speed up vertical rotation based on frequency intensities
+            if (geom.type === "sphere" && subBassAvg > 0.3) {
+              // geom.verticalRotationSpeed += subBassAvg * 0.02;
+            } else if (geom.type === "cube" && lowMidAvg > 0.4) {
+              // geom.verticalRotationSpeed += lowMidAvg * 0.015;
+            } else if (geom.type === "pyramid" && highAvg > 0.5) {
+              // geom.verticalRotationSpeed += highAvg * 0.01;
+            }
+
+            // Apply gradual vertical rotation
+            geom.verticalRotation +=
+              geom.verticalRotationSpeed * deltaTime * 60;
+            geom.mesh.rotation.x +=
+              Math.sin(geom.verticalRotation) * 0.8 * deltaTime * 60; // VERTICAL TILT
 
             // Update orbit angle with counter-rotation influence
             geom.orbitAngle +=
-              (geom.orbitSpeed * (1 + subBassAvg * 2) -
+              (geom.orbitSpeed * (1 + subBassAvg * 10) -
                 counterRotationSpeed * 0.5) *
               deltaTime *
               60;
+
+            // geom.orbitAngle +=
+            //   (geom.orbitSpeed * (1 + subBassAvg * 2) -
+            //     counterRotationSpeed * 0.5) *
+            //   deltaTime *
+            //   60;
 
             // Position at fixed points around the scene center (not following path)
             const orbitRadius =
               geom.orbitRadius * (1 + geom.frequencyResponse * 0.3);
             const x = Math.cos(geom.orbitAngle) * orbitRadius;
             const z = Math.sin(geom.orbitAngle) * orbitRadius;
-            const y = Math.sin(geom.orbitAngle * 0.3) * 50; // Slight vertical movement
+            const y = Math.sin(geom.orbitAngle * 0.5) * 50; // BOBBING ALONG SPLINE
 
             geom.mesh.position.set(x, y, z);
 

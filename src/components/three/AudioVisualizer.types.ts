@@ -195,6 +195,11 @@ export interface RotatingGeometry {
   frequencyResponse: number;
   baseScale: number;
   expansionScale: number;
+  bassScale: number;
+  bassScaleDecay: number;
+  verticalRotation: number;
+  verticalRotationSpeed: number;
+  baseVerticalRotationSpeed: number;
 }
 
 // Shooting Star Types
