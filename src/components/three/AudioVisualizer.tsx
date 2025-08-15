@@ -9,6 +9,7 @@ import type {
   AnimationState,
   SceneRef,
   ShootingStar,
+  RotatingGeometry,
   OBJData,
   Vertex,
   ChromaticShader,
@@ -55,15 +56,13 @@ const PARTICLE_COLOR: ParticleColorConfig = {
 //   subBassDecay: 0.05,
 //   subBassAttack: 5,
 // };
-// test lowbass
+// Bass configuration (removed low bass, merged into sub-bass)
 const BASS_CONFIG: BassConfig = {
-  subBassIntensity: 0.4,
-  lowBassIntensity: 0.7,
+  subBassIntensity: 0.4, // Increased since we're merging low bass into sub-bass
   lowMidIntensity: 0.8,
   highMidIntensity: 0.9,
   highIntensity: 1,
   radiusMultiplier: 17,
-  // radiusPower: 22,
   radiusPower: 20,
   particleScaleMax: 4,
   roundnessMultiplier: 20,
@@ -75,7 +74,6 @@ const BASS_CONFIG: BassConfig = {
   subBassThreshold: 0.2,
   subBassDecay: 0.05,
   subBassAttack: 6, // increases explosion of particles / other effects on bass hits
-  // subBassAttack: 5,
 };
 
 // Chromatic Aberration Configuration
@@ -633,6 +631,200 @@ const AudioVisualizer = () => {
       shootingStars.push(shootingStar);
     }
 
+    // Create particle-based rotating geometry objects
+    const rotatingGeometries: RotatingGeometry[] = [];
+
+    // Helper function to create particle cloud in shape
+    const createParticleShape = (
+      type: "sphere" | "cube" | "pyramid",
+      particleCount: number,
+    ) => {
+      const positions = new Float32Array(particleCount * 3);
+      const colors = new Float32Array(particleCount * 3);
+      const sizes = new Float32Array(particleCount);
+
+      for (let i = 0; i < particleCount; i++) {
+        let x, y, z;
+
+        if (type === "sphere") {
+          // Create sphere distribution
+          const theta = Math.random() * Math.PI * 2;
+          const phi = Math.acos(2 * Math.random() - 1);
+          const radius = 20 + Math.random() * 5;
+          x = radius * Math.sin(phi) * Math.cos(theta);
+          y = radius * Math.sin(phi) * Math.sin(theta);
+          z = radius * Math.cos(phi);
+        } else if (type === "cube") {
+          // Create cube distribution
+          const face = Math.floor(Math.random() * 6);
+          const size = 25;
+          const u = (Math.random() - 0.5) * size;
+          const v = (Math.random() - 0.5) * size;
+
+          if (face === 0) {
+            x = size / 2;
+            y = u;
+            z = v;
+          } else if (face === 1) {
+            x = -size / 2;
+            y = u;
+            z = v;
+          } else if (face === 2) {
+            x = u;
+            y = size / 2;
+            z = v;
+          } else if (face === 3) {
+            x = u;
+            y = -size / 2;
+            z = v;
+          } else if (face === 4) {
+            x = u;
+            y = v;
+            z = size / 2;
+          } else {
+            x = u;
+            y = v;
+            z = -size / 2;
+          }
+        } else {
+          // Create pyramid (tetrahedron) distribution - improved 3D version
+          const scale = 30;
+
+          // Generate random point inside tetrahedron using proper barycentric coordinates
+          let r1 = Math.random();
+          let r2 = Math.random();
+          let r3 = Math.random();
+
+          // Sort to ensure proper barycentric coordinates
+          if (r1 + r2 > 1) {
+            r1 = 1 - r1;
+            r2 = 1 - r2;
+          }
+          if (r1 + r2 + r3 > 1) {
+            if (r2 + r3 > 1) {
+              const temp = r3;
+              r3 = 1 - r1 - r2;
+              r2 = 1 - temp;
+            } else if (r1 + r2 + r3 > 1) {
+              const temp = r3;
+              r3 = r1 + r2 + r3 - 1;
+              r1 = 1 - r2 - temp;
+            }
+          }
+
+          const r4 = 1 - r1 - r2 - r3;
+
+          // Tetrahedron vertices with better 3D distribution
+          const v0 = { x: 0, y: scale, z: 0 };
+          const v1 = { x: scale * 0.866, y: -scale * 0.333, z: scale * 0.5 };
+          const v2 = { x: -scale * 0.866, y: -scale * 0.333, z: scale * 0.5 };
+          const v3 = { x: 0, y: -scale * 0.333, z: -scale };
+
+          x = r1 * v0.x + r2 * v1.x + r3 * v2.x + r4 * v3.x;
+          y = r1 * v0.y + r2 * v1.y + r3 * v2.y + r4 * v3.y;
+          z = r1 * v0.z + r2 * v1.z + r3 * v2.z + r4 * v3.z;
+        }
+
+        positions[i * 3] = x;
+        positions[i * 3 + 1] = y;
+        positions[i * 3 + 2] = z;
+
+        // Same color as main particles
+        colors[i * 3] = PARTICLE_COLOR.r;
+        colors[i * 3 + 1] = PARTICLE_COLOR.g;
+        colors[i * 3 + 2] = PARTICLE_COLOR.b;
+
+        sizes[i] = 2.0 + Math.random() * 2.0;
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.BufferAttribute(positions, 3),
+      );
+      geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+      geometry.setAttribute("size", new THREE.BufferAttribute(sizes, 1));
+
+      const material = new THREE.PointsMaterial({
+        size: 3,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending,
+        sizeAttenuation: true,
+      });
+
+      const points = new THREE.Points(geometry, material);
+      const group = new THREE.Group();
+      group.add(points);
+      scene.add(group);
+
+      return { group, geometry, material, points };
+    };
+
+    // Create sphere particle cloud for sub-bass
+    const sphereParticles = createParticleShape("sphere", 500);
+    const sphere: RotatingGeometry = {
+      mesh: sphereParticles.group,
+      material: sphereParticles.material,
+      points: sphereParticles.points,
+      geometry: sphereParticles.geometry,
+      type: "sphere",
+      baseRotationSpeed: 0.015,
+      currentRotationSpeed: 0.015,
+      scale: 1.0,
+      orbitRadius: 450,
+      orbitAngle: 0,
+      orbitSpeed: 0.01,
+      pathProgress: 0.2,
+      frequencyResponse: 0,
+      baseScale: 1.0,
+      expansionScale: 1.0,
+    };
+    rotatingGeometries.push(sphere);
+
+    // Create cube particle cloud for mids
+    const cubeParticles = createParticleShape("cube", 600);
+    const cube: RotatingGeometry = {
+      mesh: cubeParticles.group,
+      material: cubeParticles.material,
+      points: cubeParticles.points,
+      geometry: cubeParticles.geometry,
+      type: "cube",
+      baseRotationSpeed: 0.01,
+      currentRotationSpeed: 0.01,
+      scale: 1.0,
+      orbitRadius: 600,
+      orbitAngle: (Math.PI * 2) / 3,
+      orbitSpeed: 0.008,
+      pathProgress: 0.5,
+      frequencyResponse: 0,
+      baseScale: 1.0,
+      expansionScale: 1.0,
+    };
+    rotatingGeometries.push(cube);
+
+    // Create pyramid particle cloud for highs
+    const pyramidParticles = createParticleShape("pyramid", 400);
+    const pyramid: RotatingGeometry = {
+      mesh: pyramidParticles.group,
+      material: pyramidParticles.material,
+      points: pyramidParticles.points,
+      geometry: pyramidParticles.geometry,
+      type: "pyramid",
+      baseRotationSpeed: 0.005,
+      currentRotationSpeed: 0.005,
+      scale: 1.0,
+      orbitRadius: 750,
+      orbitAngle: (Math.PI * 4) / 3,
+      orbitSpeed: 0.012,
+      pathProgress: 0.8,
+      frequencyResponse: 0,
+      baseScale: 1.0,
+      expansionScale: 1.0,
+    };
+    rotatingGeometries.push(pyramid);
+
     // Create path positions array (complex spiral path like original)
     const pathPositions = new Float32Array(pathLength * 3);
     const radiusArray = new Float32Array(pathLength);
@@ -1079,6 +1271,8 @@ const AudioVisualizer = () => {
           chromaticShader: chromaticAberrationShader,
           // Shooting star references
           shootingStars,
+          // Rotating geometry references
+          rotatingGeometries,
         };
 
         setDebugInfo("Ready to play");
@@ -1175,24 +1369,20 @@ const AudioVisualizer = () => {
 
         anim.noiseOffset += 0.01;
 
-        // Calculate frequency bands
+        // Calculate frequency bands (merged sub-bass and low-bass)
         const sampleRate = 44100;
         const binHz = sampleRate / (sceneRef.current.analyzer.binCount * 2);
-        const subBassEnd = Math.floor(250 / binHz);
-        const lowBassEnd = Math.floor(400 / binHz);
+        const subBassEnd = Math.floor(400 / binHz); // Extended to include what was low-bass
         const lowMidEnd = Math.floor(1500 / binHz);
         const highMidEnd = Math.floor(3000 / binHz);
 
         // Calculate averages for each band
         let subBassTotal = 0,
-          lowBassTotal = 0,
           lowMidTotal = 0,
           highMidTotal = 0,
           highTotal = 0;
         let subBassLeft = 0,
           subBassRight = 0;
-        let lowBassLeft = 0,
-          lowBassRight = 0;
         let lowMidLeft = 0,
           lowMidRight = 0;
         let highMidLeft = 0,
@@ -1200,6 +1390,7 @@ const AudioVisualizer = () => {
         let highLeft = 0,
           highRight = 0;
 
+        // Sub-bass now includes all bass frequencies (0-400Hz)
         for (let i = 0; i < subBassEnd; i++) {
           subBassTotal += dataSubBass[i];
           subBassLeft += dataLeft[i];
@@ -1211,31 +1402,18 @@ const AudioVisualizer = () => {
         let subBassLeftAvg = subBassLeft / Math.max(1, subBassEnd) / 255;
         let subBassRightAvg = subBassRight / Math.max(1, subBassEnd) / 255;
 
-        for (let i = subBassEnd; i < lowBassEnd; i++) {
-          lowBassTotal += data[i];
-          lowBassLeft += dataLeft[i];
-          lowBassRight += dataRight[i];
-        }
-        let lowBassAvg =
-          (lowBassTotal / Math.max(1, lowBassEnd - subBassEnd) / 255) *
-          BASS_CONFIG.lowBassIntensity;
-        let lowBassLeftAvg =
-          lowBassLeft / Math.max(1, lowBassEnd - subBassEnd) / 255;
-        let lowBassRightAvg =
-          lowBassRight / Math.max(1, lowBassEnd - subBassEnd) / 255;
-
-        for (let i = lowBassEnd; i < lowMidEnd; i++) {
+        for (let i = subBassEnd; i < lowMidEnd; i++) {
           lowMidTotal += data[i];
           lowMidLeft += dataLeft[i];
           lowMidRight += dataRight[i];
         }
         let lowMidAvg =
-          (lowMidTotal / Math.max(1, lowMidEnd - lowBassEnd) / 255) *
+          (lowMidTotal / Math.max(1, lowMidEnd - subBassEnd) / 255) *
           BASS_CONFIG.lowMidIntensity;
         let lowMidLeftAvg =
-          lowMidLeft / Math.max(1, lowMidEnd - lowBassEnd) / 255;
+          lowMidLeft / Math.max(1, lowMidEnd - subBassEnd) / 255;
         let lowMidRightAvg =
-          lowMidRight / Math.max(1, lowMidEnd - lowBassEnd) / 255;
+          lowMidRight / Math.max(1, lowMidEnd - subBassEnd) / 255;
 
         for (let i = lowMidEnd; i < highMidEnd; i++) {
           highMidTotal += data[i];
@@ -1270,7 +1448,6 @@ const AudioVisualizer = () => {
         };
 
         let subBassPan = calculatePan(subBassLeftAvg, subBassRightAvg);
-        let lowBassPan = calculatePan(lowBassLeftAvg, lowBassRightAvg);
         let lowMidPan = calculatePan(lowMidLeftAvg, lowMidRightAvg);
         let highMidPan = calculatePan(highMidLeftAvg, highMidRightAvg);
         let highPan = calculatePan(highLeftAvg, highRightAvg);
@@ -1303,10 +1480,9 @@ const AudioVisualizer = () => {
 
         // Calculate overall energy for chromatic aberration
         const overallEnergy =
-          subBassAvg * 0.3 +
-          lowBassAvg * 0.2 +
-          lowMidAvg * 0.2 +
-          highMidAvg * 0.15 +
+          subBassAvg * 0.4 +
+          lowMidAvg * 0.25 +
+          highMidAvg * 0.2 +
           highAvg * 0.15;
         anim.overallEnergy = overallEnergy;
 
@@ -1388,7 +1564,7 @@ const AudioVisualizer = () => {
 
         // Calculate chromatic direction based on stereo field
         const panX = subBassPan * CHROMATIC_CONFIG.panInfluence * subBassAvg;
-        const panY = (highAvg - lowBassAvg) * 0.3; // Vertical based on frequency distribution
+        const panY = (highAvg - subBassAvg) * 0.3; // Vertical based on frequency distribution
 
         // Add some randomness on bass hits
         if (isBassHit) {
@@ -1405,10 +1581,6 @@ const AudioVisualizer = () => {
           Math.sin(anim.noiseOffset * 2.3 + anim.randomSeed) *
           0.05 *
           subBassAvg;
-        lowBassAvg +=
-          Math.sin(anim.noiseOffset * 1.9 + anim.randomSeed * 1.1) *
-          0.05 *
-          lowBassAvg;
         lowMidAvg +=
           Math.sin(anim.noiseOffset * 1.7 + anim.randomSeed * 2) *
           0.05 *
@@ -1562,11 +1734,10 @@ const AudioVisualizer = () => {
         }
 
         const visibleRange = maxVisibleProgress - minVisibleProgress;
-        const sectionSize = visibleRange / 5;
+        const sectionSize = visibleRange / 4; // Changed from 5 to 4 sections
         const subBassThreshold = minVisibleProgress + sectionSize;
-        const lowBassThreshold = minVisibleProgress + sectionSize * 2;
-        const lowMidThreshold = minVisibleProgress + sectionSize * 3;
-        const highMidThreshold = minVisibleProgress + sectionSize * 4;
+        const lowMidThreshold = minVisibleProgress + sectionSize * 2;
+        const highMidThreshold = minVisibleProgress + sectionSize * 3;
 
         // Clear arrays
         for (let i = 0; i < pathLength; i++) {
@@ -1623,20 +1794,11 @@ const AudioVisualizer = () => {
               if (isBassHit && Math.random() > 0.7) {
                 freqValue *= BASS_CONFIG.subBassAttack;
               }
-            } else if (progressAlongPath < lowBassThreshold) {
-              currentFreqAvg = lowBassAvg;
-              weight = 1.5 + lowBassAvg * 3.0;
-              weight += (Math.random() - 0.5) * 0.25;
-              if (idx >= subBassEnd && idx < lowBassEnd) {
-                freqValue = data[idx] * weight;
-              } else {
-                freqValue = lowBassAvg * 255 * weight * 0.65;
-              }
             } else if (progressAlongPath < lowMidThreshold) {
               currentFreqAvg = lowMidAvg;
               weight = 1.2 + lowMidAvg * 2.0;
               weight += (Math.random() - 0.5) * 0.2;
-              if (idx >= lowBassEnd && idx < lowMidEnd) {
+              if (idx >= subBassEnd && idx < lowMidEnd) {
                 freqValue = data[idx] * weight;
               } else {
                 freqValue = lowMidAvg * 255 * weight * 0.7;
@@ -1698,8 +1860,6 @@ const AudioVisualizer = () => {
                     shakeArray[pathIndex * 3 + 1] *= 1.5;
                     shakeArray[pathIndex * 3 + 2] *= 1.5;
                   }
-                } else if (progressAlongPath < lowBassThreshold) {
-                  panArray[pathIndex] = lowBassPan * lowBassAvg;
                 } else if (progressAlongPath < lowMidThreshold) {
                   panArray[pathIndex] = lowMidPan * lowMidAvg;
                 } else if (progressAlongPath < highMidThreshold) {
@@ -1735,9 +1895,7 @@ const AudioVisualizer = () => {
             let sectionAvg = 0;
             if (pathProgress <= 0.2) {
               sectionAvg = subBassAvg;
-            } else if (pathProgress <= 0.4) {
-              sectionAvg = lowBassAvg;
-            } else if (pathProgress <= 0.6) {
+            } else if (pathProgress <= 0.5) {
               sectionAvg = lowMidAvg;
             } else if (pathProgress <= 0.8) {
               sectionAvg = highMidAvg;
@@ -1763,10 +1921,9 @@ const AudioVisualizer = () => {
           const bassParticleScale =
             1.0 + subBassAvg * (BASS_CONFIG.particleScaleMax - 1.0) * 1.5;
           const overallEnergy =
-            subBassAvg * 0.3 +
-            lowBassAvg * 0.2 +
-            lowMidAvg * 0.2 +
-            highMidAvg * 0.15 +
+            subBassAvg * 0.4 +
+            lowMidAvg * 0.25 +
+            highMidAvg * 0.2 +
             highAvg * 0.15;
           let targetParticleScale =
             1.0 + overallEnergy * (BASS_CONFIG.particleScaleMax - 1.0);
@@ -1931,6 +2088,91 @@ const AudioVisualizer = () => {
           });
         }
 
+        // Update particle-based rotating geometries with counter-rotation and expansion
+        if (sceneRef.current.rotatingGeometries) {
+          // Get camera rotation for counter-rotation
+          const cameraAzimuthal = controls.azimuthalAngle;
+
+          sceneRef.current.rotatingGeometries.forEach((geom) => {
+            // Get frequency response based on geometry type
+            if (geom.type === "sphere") {
+              geom.frequencyResponse = subBassAvg;
+            } else if (geom.type === "cube") {
+              geom.frequencyResponse = lowMidAvg;
+            } else if (geom.type === "pyramid") {
+              geom.frequencyResponse = highAvg;
+            }
+
+            // Calculate expansion based on frequency response
+            const targetExpansion = 1.0 + geom.frequencyResponse * 3.0;
+            geom.expansionScale +=
+              (targetExpansion - geom.expansionScale) * 0.2;
+
+            // Apply expansion to the particle group
+            geom.mesh.scale.setScalar(geom.expansionScale);
+
+            // Counter-rotate against camera rotation
+            const counterRotationSpeed = controls.autoRotateSpeed * 0.02; // Counter to camera auto-rotation
+
+            // Update rotation speed based on frequency and sub-bass rotation
+            const baseSpeed = geom.baseRotationSpeed;
+            const freqBoost =
+              geom.frequencyResponse * BASS_CONFIG.rotationSpeedMax * 0.02;
+            const subBassInfluence =
+              subBassAvg * BASS_CONFIG.subBassRotationIntensity * 0.02;
+            geom.currentRotationSpeed =
+              baseSpeed + freqBoost + subBassInfluence;
+
+            // Add extra rotation on bass hits
+            if (isBassHit) {
+              geom.currentRotationSpeed *= 2.0;
+            }
+
+            // Rotate the geometry counter to camera + its own rotation
+            geom.mesh.rotation.x += geom.currentRotationSpeed * deltaTime * 60;
+            geom.mesh.rotation.y +=
+              (geom.currentRotationSpeed - counterRotationSpeed) *
+              deltaTime *
+              60;
+            geom.mesh.rotation.z += geom.currentRotationSpeed * deltaTime * 30;
+
+            // Update orbit angle with counter-rotation influence
+            geom.orbitAngle +=
+              (geom.orbitSpeed * (1 + subBassAvg * 2) -
+                counterRotationSpeed * 0.5) *
+              deltaTime *
+              60;
+
+            // Position at fixed points around the scene center (not following path)
+            const orbitRadius =
+              geom.orbitRadius * (1 + geom.frequencyResponse * 0.3);
+            const x = Math.cos(geom.orbitAngle) * orbitRadius;
+            const z = Math.sin(geom.orbitAngle) * orbitRadius;
+            const y = Math.sin(geom.orbitAngle * 0.3) * 50; // Slight vertical movement
+
+            geom.mesh.position.set(x, y, z);
+
+            // Update material opacity and size based on frequency
+            const intensityMultiplier = 0.5 + geom.frequencyResponse * 1.5;
+            geom.material.opacity = Math.min(1.0, intensityMultiplier);
+            geom.material.size = 3 + geom.frequencyResponse * 5;
+
+            // Apply color inversion based on animation state
+            const colorInversion = anim.colorInversionProgress;
+            const baseColor = PARTICLE_COLOR.r; // All particles are white (1,1,1)
+            const invertedColor = 1.0 - baseColor;
+            const finalColor =
+              baseColor * (1 - colorInversion) + invertedColor * colorInversion;
+
+            // Update particle colors using direct geometry reference
+            const colors = geom.geometry.attributes.color;
+            for (let i = 0; i < colors.count; i++) {
+              colors.setXYZ(i, finalColor, finalColor, finalColor);
+            }
+            colors.needsUpdate = true;
+          });
+        }
+
         if (frameCount % 30 === 0) {
           const chromaticPercent = (
             (anim.chromaticStrength / CHROMATIC_CONFIG.modes.GLITCH.max) *
@@ -1944,7 +2186,7 @@ const AudioVisualizer = () => {
           const highMidPercent = (highMidAvg * 100).toFixed(0);
           const combinedAudio = (highMidAvg * 0.6 + highAvg * 0.4) * 100;
           setDebugInfo(
-            `Sub: ${(subBassAvg * 100).toFixed(0)}% | Low: ${(lowBassAvg * 100).toFixed(0)}% | HiMid: ${highMidPercent}%/${(SHOOTING_STAR_CONFIG.highMidThreshold * 100).toFixed(0)}% | High: ${(highAvg * 100).toFixed(0)}%/${(SHOOTING_STAR_CONFIG.highFreqThreshold * 100).toFixed(0)}% | Combined: ${combinedAudio.toFixed(0)}%/${(SHOOTING_STAR_CONFIG.combinedThreshold * 100).toFixed(0)}% | Head: ${headProgress}%/90% | Stars: ${activeStars}/${SHOOTING_STAR_CONFIG.maxActiveStars}`,
+            `Sub: ${(subBassAvg * 100).toFixed(0)}% | Mid: ${(lowMidAvg * 100).toFixed(0)}% | HiMid: ${highMidPercent}%/${(SHOOTING_STAR_CONFIG.highMidThreshold * 100).toFixed(0)}% | High: ${(highAvg * 100).toFixed(0)}%/${(SHOOTING_STAR_CONFIG.highFreqThreshold * 100).toFixed(0)}% | Combined: ${combinedAudio.toFixed(0)}%/${(SHOOTING_STAR_CONFIG.combinedThreshold * 100).toFixed(0)}% | Head: ${headProgress}%/90% | Stars: ${activeStars}/${SHOOTING_STAR_CONFIG.maxActiveStars}`,
           );
         }
       } else {
@@ -1979,6 +2221,85 @@ const AudioVisualizer = () => {
               star.mesh.visible = false;
               star.material.opacity = 0;
             }
+          });
+        }
+
+        // Update rotating geometries when not playing (idle animation)
+        if (sceneRef.current.rotatingGeometries && pathPositions) {
+          sceneRef.current.rotatingGeometries.forEach((geom) => {
+            // Slow idle rotation
+            geom.mesh.rotation.x += geom.baseRotationSpeed * deltaTime * 30;
+            geom.mesh.rotation.y +=
+              geom.baseRotationSpeed * deltaTime * 30 * 1.3;
+            geom.mesh.rotation.z +=
+              geom.baseRotationSpeed * deltaTime * 30 * 0.7;
+
+            // Slow idle orbit
+            geom.orbitAngle += geom.orbitSpeed * deltaTime * 30;
+
+            // Get interpolated position along the path using Catmull-Rom
+            const tMax = pathLength - 1;
+            const tPoint = tMax * geom.pathProgress;
+            const tIndex = Math.floor(tPoint);
+            const tWeight = tPoint - tIndex;
+
+            const i0 = Math.max(0, tIndex - 1);
+            const i1 = tIndex;
+            const i2 = Math.min(tIndex + 1, tMax);
+            const i3 = Math.min(tIndex + 2, tMax);
+
+            // Get path points for interpolation
+            const p0x = pathPositions[i0 * 3];
+            const p0y = pathPositions[i0 * 3 + 1];
+            const p0z = pathPositions[i0 * 3 + 2];
+
+            const p1x = pathPositions[i1 * 3];
+            const p1y = pathPositions[i1 * 3 + 1];
+            const p1z = pathPositions[i1 * 3 + 2];
+
+            const p2x = pathPositions[i2 * 3];
+            const p2y = pathPositions[i2 * 3 + 1];
+            const p2z = pathPositions[i2 * 3 + 2];
+
+            const p3x = pathPositions[i3 * 3];
+            const p3y = pathPositions[i3 * 3 + 1];
+            const p3z = pathPositions[i3 * 3 + 2];
+
+            // Interpolate position using Catmull-Rom spline
+            const pathX = catmullRom(p0x, p1x, p2x, p3x, tWeight);
+            const pathY = catmullRom(p0y, p1y, p2y, p3y, tWeight);
+            const pathZ = catmullRom(p0z, p1z, p2z, p3z, tWeight);
+
+            // Calculate orbit position around the path point (no frequency influence when idle)
+            const orbitX = Math.cos(geom.orbitAngle) * geom.orbitRadius;
+            const orbitZ = Math.sin(geom.orbitAngle) * geom.orbitRadius;
+
+            // Set position
+            geom.mesh.position.set(pathX + orbitX, pathY, pathZ + orbitZ);
+
+            // Reset to default scale
+            geom.expansionScale += (1.0 - geom.expansionScale) * 0.1;
+            geom.mesh.scale.setScalar(geom.expansionScale);
+
+            // Reset material properties
+            geom.material.size = 3;
+
+            // Reset opacity
+            geom.material.opacity = 0.5;
+
+            // Apply color inversion even when idle
+            const colorInversion = anim.colorInversionProgress;
+            const baseColor = PARTICLE_COLOR.r; // All particles are white (1,1,1)
+            const invertedColor = 1.0 - baseColor;
+            const finalColor =
+              baseColor * (1 - colorInversion) + invertedColor * colorInversion;
+
+            // Update particle colors using direct geometry reference
+            const colors = geom.geometry.attributes.color;
+            for (let i = 0; i < colors.count; i++) {
+              colors.setXYZ(i, finalColor, finalColor, finalColor);
+            }
+            colors.needsUpdate = true;
           });
         }
       }

@@ -19,7 +19,6 @@ export interface ParticleColorConfig {
 
 export interface BassConfig {
   subBassIntensity: number;
-  lowBassIntensity: number;
   lowMidIntensity: number;
   highMidIntensity: number;
   highIntensity: number;
@@ -179,6 +178,25 @@ export interface AnimationState {
   tempInversionStart: number;
 }
 
+// Rotating Geometry Types
+export interface RotatingGeometry {
+  mesh: THREE.Group;
+  material: THREE.PointsMaterial;
+  points: THREE.Points;
+  geometry: THREE.BufferGeometry;
+  type: 'sphere' | 'cube' | 'pyramid';
+  baseRotationSpeed: number;
+  currentRotationSpeed: number;
+  scale: number;
+  orbitRadius: number;
+  orbitAngle: number;
+  orbitSpeed: number;
+  pathProgress: number;
+  frequencyResponse: number;
+  baseScale: number;
+  expansionScale: number;
+}
+
 // Shooting Star Types
 export interface ShootingStar {
   mesh: THREE.Mesh;
@@ -260,6 +278,7 @@ export interface SceneRef {
   postQuad: THREE.Mesh;
   chromaticShader: ChromaticShader;
   shootingStars: ShootingStar[];
+  rotatingGeometries: RotatingGeometry[];
 }
 
 // Helper function types
