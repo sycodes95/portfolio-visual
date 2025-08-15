@@ -742,7 +742,7 @@ const AudioVisualizer = () => {
         colors[i * 3 + 1] = 1.0;
         colors[i * 3 + 2] = 1.0;
 
-        sizes[i] = 2.0 + Math.random() * 2.0;
+        sizes[i] = (2.0 + Math.random() * 2.0) * 0.7; // 30% smaller
       }
 
       const geometry = new THREE.BufferGeometry();
@@ -784,10 +784,10 @@ const AudioVisualizer = () => {
       orbitRadius: 450,
       orbitAngle: 0,
       orbitSpeed: 0.01,
-      pathProgress: 0.2,
+      pathProgress: 0.1, // Start near bottom
       frequencyResponse: 0,
-      baseScale: 1.0,
-      expansionScale: 1.0,
+      baseScale: 0.001,
+      expansionScale: 0.001,
       bassScale: 1.0,
       bassScaleDecay: 0.95,
       verticalRotation: 0,
@@ -810,10 +810,10 @@ const AudioVisualizer = () => {
       orbitRadius: 600,
       orbitAngle: (Math.PI * 2) / 3,
       orbitSpeed: 0.01,
-      pathProgress: 0.5,
+      pathProgress: 0.0, // Start at very bottom
       frequencyResponse: 0,
-      baseScale: 1.0,
-      expansionScale: 1.0,
+      baseScale: 0.001,
+      expansionScale: 0.001,
       bassScale: 1.0,
       bassScaleDecay: 0.95,
       verticalRotation: 0,
@@ -836,10 +836,10 @@ const AudioVisualizer = () => {
       orbitRadius: 750,
       orbitAngle: (Math.PI * 4) / 3,
       orbitSpeed: 0.01,
-      pathProgress: 0.8,
+      pathProgress: 0.2, // Start near bottom but offset
       frequencyResponse: 0,
-      baseScale: 1.0,
-      expansionScale: 1.0,
+      baseScale: 0.001,
+      expansionScale: 0.001,
       bassScale: 1.0,
       bassScaleDecay: 0.95,
       verticalRotation: 0,
@@ -2148,9 +2148,10 @@ const AudioVisualizer = () => {
             geom.expansionScale +=
               (targetExpansion - geom.expansionScale) * 0.2;
 
-            // Bass-reactive scaling with decay
+            // Bass-reactive scaling with decay - expand to baseline size on bass hits
             if (isBassHit) {
-              geom.bassScale = Math.max(geom.bassScale, 1.0 + subBassAvg * 2.5);
+              // Scale up to 335x (0.001 * 335 = 0.335, the old baseline size)
+              geom.bassScale = Math.max(geom.bassScale, 1.0 + subBassAvg * 334.0);
             }
             geom.bassScale *= geom.bassScaleDecay;
             geom.bassScale = Math.max(geom.bassScale, 1.0);
@@ -2203,18 +2204,16 @@ const AudioVisualizer = () => {
             geom.mesh.rotation.x +=
               Math.sin(geom.verticalRotation) * 0.8 * deltaTime * 60; // VERTICAL TILT
 
-            // Update orbit angle with counter-rotation influence
-            // Extra boost on bass hits
-            let bassMultiplier = 1 + subBassAvg * 15;
+            // Update orbit angle with massive bass speed boost
+            let bassMultiplier = 1 + subBassAvg * 10;
             if (isBassHit) {
-              bassMultiplier *= 4; // Quadruple speed on actual bass hits
+              bassMultiplier *= 20; // 20x speed on bass hits for insanely fast orbiting
             }
 
             geom.orbitAngle +=
-              (geom.orbitSpeed * bassMultiplier -
-                counterRotationSpeed * 0.5) *
-              deltaTime *
-              60;
+              geom.orbitSpeed * bassMultiplier * deltaTime * 60;
+
+            // No path progression - just orbit in place
 
             // geom.orbitAngle +=
             //   (geom.orbitSpeed * (1 + subBassAvg * 2) -
@@ -2222,12 +2221,22 @@ const AudioVisualizer = () => {
             //   deltaTime *
             //   60;
 
-            // Position at fixed points around the scene center (not following path)
-            const orbitRadius =
-              geom.orbitRadius * (1 + geom.frequencyResponse * 0.3);
-            const x = Math.cos(geom.orbitAngle) * orbitRadius;
-            const z = Math.sin(geom.orbitAngle) * orbitRadius;
-            const y = Math.sin(geom.orbitAngle * 0.5) * 50; // BOBBING ALONG SPLINE
+            // Orbital motion with bass-reactive vertical movement
+            const centerX = 0;
+            const centerZ = 0;
+            const baseY = 0; // Fixed height, no traveling up
+            
+            // Vertical movement based on bass hits
+            let verticalOffset = 0;
+            if (isBassHit) {
+              verticalOffset = subBassAvg * 200; // Jump up on bass hits
+            }
+
+            // Smooth orbital motion
+            const orbitRadius = geom.orbitRadius * (1 + geom.frequencyResponse * 0.3);
+            const x = centerX + Math.cos(geom.orbitAngle) * orbitRadius;
+            const z = centerZ + Math.sin(geom.orbitAngle) * orbitRadius;
+            const y = baseY + verticalOffset + Math.sin(geom.orbitAngle * 0.5) * 50; // BOBBING + bass vertical
 
             geom.mesh.position.set(x, y, z);
 
@@ -2248,9 +2257,9 @@ const AudioVisualizer = () => {
               particleScale = 1.0 + highAvg * (BASS_CONFIG.particleScaleMax - 1.0) * 1.0;
             }
             
-            // Apply particle size with bass hit boost (reduced by 40%)
+            // Apply particle size with bass hit boost (reduced by 40% + 30% smaller)
             const bassBoost = isBassHit ? 1.5 : 1.0;
-            geom.material.size = (3 + geom.frequencyResponse * 5) * particleScale * bassBoost * 0.6;
+            geom.material.size = (3 + geom.frequencyResponse * 5) * particleScale * bassBoost * 0.6 * 0.7;
 
             // Keep shapes white with additive blending - only visible on black background
             geom.material.blending = THREE.AdditiveBlending;
@@ -2319,7 +2328,7 @@ const AudioVisualizer = () => {
             geom.mesh.rotation.z +=
               geom.baseRotationSpeed * deltaTime * 30 * 0.7;
 
-            // Slow idle orbit
+            // Slow idle orbit only
             geom.orbitAngle += geom.orbitSpeed * deltaTime * 30;
 
             // Get interpolated position along the path using Catmull-Rom
@@ -2350,24 +2359,25 @@ const AudioVisualizer = () => {
             const p3y = pathPositions[i3 * 3 + 1];
             const p3z = pathPositions[i3 * 3 + 2];
 
-            // Interpolate position using Catmull-Rom spline
-            const pathX = catmullRom(p0x, p1x, p2x, p3x, tWeight);
-            const pathY = catmullRom(p0y, p1y, p2y, p3y, tWeight);
-            const pathZ = catmullRom(p0z, p1z, p2z, p3z, tWeight);
+            // Simple orbital motion around center (no traveling up)
+            const centerX = 0;
+            const centerZ = 0;
+            const baseY = 0; // Fixed height
 
-            // Calculate orbit position around the path point (no frequency influence when idle)
-            const orbitX = Math.cos(geom.orbitAngle) * geom.orbitRadius;
-            const orbitZ = Math.sin(geom.orbitAngle) * geom.orbitRadius;
+            // Smooth orbital motion
+            const x = centerX + Math.cos(geom.orbitAngle) * geom.orbitRadius;
+            const z = centerZ + Math.sin(geom.orbitAngle) * geom.orbitRadius;
+            const y = baseY + Math.sin(geom.orbitAngle * 0.5) * 50; // Just bobbing
 
             // Set position
-            geom.mesh.position.set(pathX + orbitX, pathY, pathZ + orbitZ);
+            geom.mesh.position.set(x, y, z);
 
             // Reset to default scale
             geom.expansionScale += (1.0 - geom.expansionScale) * 0.1;
             geom.mesh.scale.setScalar(geom.expansionScale);
 
-            // Reset material properties
-            geom.material.size = 3;
+            // Reset material properties (30% smaller)
+            geom.material.size = 3 * 0.7;
 
             // Reset opacity
             geom.material.opacity = 0.5;
