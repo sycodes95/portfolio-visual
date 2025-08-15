@@ -45,6 +45,9 @@ export { default as dash_lyny } from "./Dash - LYNY - SoundLoadMate.com.mp3";
 export { default as takeback_lyny } from "./Take Back - LYNY - SoundLoadMate.com.mp3";
 export { default as laundry_money_lyny } from "./Jon Casey _ LYNY - Laundry Money - LYNY_ Jon Casey - SoundLoadMate.com.mp3";
 export { default as throw_lyny } from "./THROW - LYNY - SoundLoadMate.com.mp3";
+export { default as carbon_thook } from "./CARBON w_ JKuch - thook_ JKuch - SoundLoadMate.com.mp3";
+export { default as alone_wink } from "./WINK - aloneee - SABLE VALLEY - SoundLoadMate.com.mp3";
+export { default as leaving_wink } from "./WINK _ PEEKABOO - leaving _dont tell me_ - SABLE VALLEY - SoundLoadMate.com.mp3";
 
 export const immortal_eprom =
   "https://audio.jukehost.co.uk/Yszr2ZqGhoNJNAGTEPFQGB5AtMXCSwjw";

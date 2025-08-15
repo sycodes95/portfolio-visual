@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { nobody_lyny } from "../../assets/mp3s";
+import { alone_wink, areuthere_muramasa, asteroids_prolix, basscannon_lyny, carbon_thook, daydreams_gjones, flusterfuck_isqa, geyron_eprom, hard_sophie, holdmedown_borne, leaving_wink, levels_loj, lost_stwo, nobody_lyny, section_lyny, stephanie_danielallen, throw_lyny } from "../../assets/mp3s";
 import type {
   ParticleColorConfig,
   BassConfig,
@@ -17,7 +17,7 @@ import type {
   CatmullRomFunction,
 } from "./AudioVisualizer.types";
 
-const aud = nobody_lyny; // Update this path as needed
+const aud = section_lyny; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR: ParticleColorConfig = {
@@ -62,10 +62,11 @@ const BASS_CONFIG: BassConfig = {
   lowMidIntensity: 0.8,
   highMidIntensity: 0.9,
   highIntensity: 1,
-  radiusMultiplier: 17,
-  radiusPower: 20,
-  particleScaleMax: 4,
-  roundnessMultiplier: 20,
+  radiusMultiplier: 10,
+  // radiusMultiplier: 17,
+  radiusPower: 14,
+  particleScaleMax: 5,
+  roundnessMultiplier: 25,
   lightIntensityMultiplier: 10,
   rotationSpeedMax: 44,
   enableColorShift: true,
@@ -73,7 +74,7 @@ const BASS_CONFIG: BassConfig = {
   subBassRotationIntensity: 25,
   subBassThreshold: 0.2,
   subBassDecay: 0.05,
-  subBassAttack: 6, // increases explosion of particles / other effects on bass hits
+  subBassAttack: 3, // increases explosion of particles / other effects on bass hits
 };
 
 // Chromatic Aberration Configuration
@@ -201,7 +202,7 @@ class CameraController {
     this.previousMouseY = 0;
     this.spherical = new THREE.Spherical();
     this.minDistance = 50;
-    this.maxDistance = 2000;
+    this.maxDistance = 3000;
     this.minPolarAngle = Math.PI * 0.4;
     this.maxPolarAngle = Math.PI * 0.6;
     this.lastTime = performance.now();
@@ -443,7 +444,7 @@ const AudioVisualizer = () => {
       0.1,
       10000,
     );
-    camera.position.set(0, 0, 1200);
+    camera.position.set(0, 0, 1500);
 
     // Renderer with post-processing support
     const renderer = new THREE.WebGLRenderer({
@@ -2207,7 +2208,7 @@ const AudioVisualizer = () => {
             // Update orbit angle with massive bass speed boost
             let bassMultiplier = 1 + subBassAvg * 10;
             if (isBassHit) {
-              bassMultiplier *= 20; // 20x speed on bass hits for insanely fast orbiting
+              bassMultiplier *= 10; // 20x speed on bass hits for insanely fast orbiting
             }
 
             geom.orbitAngle +=
@@ -2496,7 +2497,7 @@ const AudioVisualizer = () => {
       setDebugInfo("Playing...");
       sceneRef.current.camera.position.set(0, 0, 10000);
       sceneRef.current.controls.distance = 10000;
-      sceneRef.current.controls.targetDistance = 1500;
+      sceneRef.current.controls.targetDistance = 2000;
     } catch (error) {
       console.error("Error playing audio:", error);
       setDebugInfo(`Error: ${error}`);
