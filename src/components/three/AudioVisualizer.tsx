@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { alone_wink, areuthere_muramasa, asteroids_prolix, basscannon_lyny, carbon_thook, daydreams_gjones, flusterfuck_isqa, geyron_eprom, hard_sophie, holdmedown_borne, leaving_wink, levels_loj, lost_stwo, nobody_lyny, section_lyny, stephanie_danielallen, throw_lyny } from "../../assets/mp3s";
+import { alone_wink, areuthere_muramasa, asteroids_prolix, basscannon_lyny, carbon_thook, daydreams_gjones, flusterfuck_isqa, fuckyou_yojas, geyron_eprom, hard_sophie, holdmedown_borne, honey_medasin, leaving_wink, levels_loj, lost_stwo, nobody_lyny, power_loj, section_lyny, stephanie_danielallen, thecircle_eprom, throw_lyny, ybn_yojas } from "../../assets/mp3s";
 import type {
   ParticleColorConfig,
   BassConfig,
@@ -17,7 +17,7 @@ import type {
   CatmullRomFunction,
 } from "./AudioVisualizer.types";
 
-const aud = section_lyny; // Update this path as needed
+const aud = thecircle_eprom; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR: ParticleColorConfig = {
@@ -58,15 +58,15 @@ const PARTICLE_COLOR: ParticleColorConfig = {
 // };
 // Bass configuration (removed low bass, merged into sub-bass)
 const BASS_CONFIG: BassConfig = {
-  subBassIntensity: 0.4, // Increased since we're merging low bass into sub-bass
+  subBassIntensity: 0.45, // Increased since we're merging low bass into sub-bass
   lowMidIntensity: 0.8,
   highMidIntensity: 0.9,
   highIntensity: 1,
-  radiusMultiplier: 10,
+  radiusMultiplier: 19,
   // radiusMultiplier: 17,
-  radiusPower: 14,
-  particleScaleMax: 5,
-  roundnessMultiplier: 25,
+  radiusPower: 17,
+  particleScaleMax: 4,
+  roundnessMultiplier: 20,
   lightIntensityMultiplier: 10,
   rotationSpeedMax: 44,
   enableColorShift: true,
@@ -74,7 +74,7 @@ const BASS_CONFIG: BassConfig = {
   subBassRotationIntensity: 25,
   subBassThreshold: 0.2,
   subBassDecay: 0.05,
-  subBassAttack: 3, // increases explosion of particles / other effects on bass hits
+  subBassAttack: 4, // increases explosion of particles / other effects on bass hits
 };
 
 // Chromatic Aberration Configuration
@@ -384,9 +384,17 @@ const AudioVisualizer = () => {
   const isPlayingRef = useRef(false);
 
   const pathLength = 256;
-  const particleCount = 77777;
-  const prefabDelay = 0.00015;
-  const vertexDelay = 0.0075;
+  // const particleCount = 77777;
+  const particleCount = 59595;
+  // const prefabDelay = 0.00015;
+  const prefabDelay = 0.00025;
+  const vertexDelay = 0.0125;
+	// vertex delay
+	// 0.0275 gives a more geometric vibe
+	// 0.0075 gives a more stringy vibe
+
+	// 0.0025 gives a separated stringy vibe
+
   const minDuration = 40;
   const maxDuration = 600;
 
