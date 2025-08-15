@@ -687,52 +687,60 @@ const AudioVisualizer = () => {
             z = -size / 2;
           }
         } else {
-          // Create pyramid (tetrahedron) distribution - improved 3D version
+          // Create bipyramid (diamond/double pyramid) distribution
           const scale = 30;
+          const isUpperPyramid = Math.random() < 0.5; // 50% upper, 50% lower
 
-          // Generate random point inside tetrahedron using proper barycentric coordinates
+          // Base square vertices (shared between both pyramids)
+          const baseVertices = [
+            { x: scale * 0.5, y: 0, z: scale * 0.5 },
+            { x: -scale * 0.5, y: 0, z: scale * 0.5 },
+            { x: -scale * 0.5, y: 0, z: -scale * 0.5 },
+            { x: scale * 0.5, y: 0, z: -scale * 0.5 }
+          ];
+
+          // Apex vertices
+          const upperApex = { x: 0, y: scale * 0.7, z: 0 };
+          const lowerApex = { x: 0, y: -scale * 0.7, z: 0 };
+
+          // Generate random barycentric coordinates for pyramid
           let r1 = Math.random();
           let r2 = Math.random();
           let r3 = Math.random();
 
-          // Sort to ensure proper barycentric coordinates
-          if (r1 + r2 > 1) {
-            r1 = 1 - r1;
-            r2 = 1 - r2;
+          // Normalize to sum to 1 for proper barycentric coordinates
+          const sum = r1 + r2 + r3;
+          r1 /= sum;
+          r2 /= sum;
+          r3 /= sum;
+
+          if (isUpperPyramid) {
+            // Upper pyramid: base square + upper apex
+            const basePoint = Math.floor(Math.random() * 4);
+            const nextBase = (basePoint + 1) % 4;
+            
+            x = r1 * baseVertices[basePoint].x + r2 * baseVertices[nextBase].x + r3 * upperApex.x;
+            y = r1 * baseVertices[basePoint].y + r2 * baseVertices[nextBase].y + r3 * upperApex.y;
+            z = r1 * baseVertices[basePoint].z + r2 * baseVertices[nextBase].z + r3 * upperApex.z;
+          } else {
+            // Lower pyramid: base square + lower apex
+            const basePoint = Math.floor(Math.random() * 4);
+            const nextBase = (basePoint + 1) % 4;
+            
+            x = r1 * baseVertices[basePoint].x + r2 * baseVertices[nextBase].x + r3 * lowerApex.x;
+            y = r1 * baseVertices[basePoint].y + r2 * baseVertices[nextBase].y + r3 * lowerApex.y;
+            z = r1 * baseVertices[basePoint].z + r2 * baseVertices[nextBase].z + r3 * lowerApex.z;
           }
-          if (r1 + r2 + r3 > 1) {
-            if (r2 + r3 > 1) {
-              const temp = r3;
-              r3 = 1 - r1 - r2;
-              r2 = 1 - temp;
-            } else if (r1 + r2 + r3 > 1) {
-              const temp = r3;
-              r3 = r1 + r2 + r3 - 1;
-              r1 = 1 - r2 - temp;
-            }
-          }
-
-          const r4 = 1 - r1 - r2 - r3;
-
-          // Tetrahedron vertices with better 3D distribution
-          const v0 = { x: 0, y: scale, z: 0 };
-          const v1 = { x: scale * 0.866, y: -scale * 0.333, z: scale * 0.5 };
-          const v2 = { x: -scale * 0.866, y: -scale * 0.333, z: scale * 0.5 };
-          const v3 = { x: 0, y: -scale * 0.333, z: -scale };
-
-          x = r1 * v0.x + r2 * v1.x + r3 * v2.x + r4 * v3.x;
-          y = r1 * v0.y + r2 * v1.y + r3 * v2.y + r4 * v3.y;
-          z = r1 * v0.z + r2 * v1.z + r3 * v2.z + r4 * v3.z;
         }
 
         positions[i * 3] = x;
         positions[i * 3 + 1] = y;
         positions[i * 3 + 2] = z;
 
-        // Same color as main particles
-        colors[i * 3] = PARTICLE_COLOR.r;
-        colors[i * 3 + 1] = PARTICLE_COLOR.g;
-        colors[i * 3 + 2] = PARTICLE_COLOR.b;
+        // Start with white like spline particles
+        colors[i * 3] = 1.0;
+        colors[i * 3 + 1] = 1.0;
+        colors[i * 3 + 2] = 1.0;
 
         sizes[i] = 2.0 + Math.random() * 2.0;
       }
@@ -2196,8 +2204,14 @@ const AudioVisualizer = () => {
               Math.sin(geom.verticalRotation) * 0.8 * deltaTime * 60; // VERTICAL TILT
 
             // Update orbit angle with counter-rotation influence
+            // Extra boost on bass hits
+            let bassMultiplier = 1 + subBassAvg * 15;
+            if (isBassHit) {
+              bassMultiplier *= 4; // Quadruple speed on actual bass hits
+            }
+
             geom.orbitAngle +=
-              (geom.orbitSpeed * (1 + subBassAvg * 10) -
+              (geom.orbitSpeed * bassMultiplier -
                 counterRotationSpeed * 0.5) *
               deltaTime *
               60;
@@ -2220,21 +2234,27 @@ const AudioVisualizer = () => {
             // Update material opacity and size based on frequency
             const intensityMultiplier = 0.5 + geom.frequencyResponse * 1.5;
             geom.material.opacity = Math.min(1.0, intensityMultiplier);
-            geom.material.size = 3 + geom.frequencyResponse * 5;
-
-            // Apply color inversion based on animation state
-            const colorInversion = anim.colorInversionProgress;
-            const baseColor = PARTICLE_COLOR.r; // All particles are white (1,1,1)
-            const invertedColor = 1.0 - baseColor;
-            const finalColor =
-              baseColor * (1 - colorInversion) + invertedColor * colorInversion;
-
-            // Update particle colors using direct geometry reference
-            const colors = geom.geometry.attributes.color;
-            for (let i = 0; i < colors.count; i++) {
-              colors.setXYZ(i, finalColor, finalColor, finalColor);
+            
+            // Enhanced particle size scaling like spline particles
+            let particleScale = 1.0;
+            if (geom.type === "sphere") {
+              // Bass-reactive scaling for sphere
+              particleScale = 1.0 + subBassAvg * (BASS_CONFIG.particleScaleMax - 1.0) * 1.5;
+            } else if (geom.type === "cube") {
+              // Mid-frequency scaling for cube
+              particleScale = 1.0 + lowMidAvg * (BASS_CONFIG.particleScaleMax - 1.0) * 1.2;
+            } else if (geom.type === "pyramid") {
+              // High-frequency scaling for pyramid
+              particleScale = 1.0 + highAvg * (BASS_CONFIG.particleScaleMax - 1.0) * 1.0;
             }
-            colors.needsUpdate = true;
+            
+            // Apply particle size with bass hit boost (reduced by 40%)
+            const bassBoost = isBassHit ? 1.5 : 1.0;
+            geom.material.size = (3 + geom.frequencyResponse * 5) * particleScale * bassBoost * 0.6;
+
+            // Keep shapes white with additive blending - only visible on black background
+            geom.material.blending = THREE.AdditiveBlending;
+            geom.material.color.setRGB(1, 1, 1);
           });
         }
 
@@ -2352,19 +2372,9 @@ const AudioVisualizer = () => {
             // Reset opacity
             geom.material.opacity = 0.5;
 
-            // Apply color inversion even when idle
-            const colorInversion = anim.colorInversionProgress;
-            const baseColor = PARTICLE_COLOR.r; // All particles are white (1,1,1)
-            const invertedColor = 1.0 - baseColor;
-            const finalColor =
-              baseColor * (1 - colorInversion) + invertedColor * colorInversion;
-
-            // Update particle colors using direct geometry reference
-            const colors = geom.geometry.attributes.color;
-            for (let i = 0; i < colors.count; i++) {
-              colors.setXYZ(i, finalColor, finalColor, finalColor);
-            }
-            colors.needsUpdate = true;
+            // Keep shapes white with additive blending - only visible on black background
+            geom.material.blending = THREE.AdditiveBlending;
+            geom.material.color.setRGB(1, 1, 1);
           });
         }
       }
