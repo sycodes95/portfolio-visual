@@ -2151,7 +2151,7 @@ const AudioVisualizer = () => {
             // Bass-reactive scaling with decay - expand to baseline size on bass hits
             if (isBassHit) {
               // Scale up to 335x (0.001 * 335 = 0.335, the old baseline size)
-              geom.bassScale = Math.max(geom.bassScale, 1.0 + subBassAvg * 334.0);
+              geom.bassScale = Math.max(geom.bassScale, 1.0 + subBassAvg * 25);
             }
             geom.bassScale *= geom.bassScaleDecay;
             geom.bassScale = Math.max(geom.bassScale, 1.0);
@@ -2263,6 +2263,9 @@ const AudioVisualizer = () => {
 
             // Keep shapes white with additive blending - only visible on black background
             geom.material.blending = THREE.AdditiveBlending;
+						if(anim.colorInversionTarget === 1) {
+							geom.material.opacity = 0;
+						}
             geom.material.color.setRGB(1, 1, 1);
           });
         }
@@ -2384,7 +2387,8 @@ const AudioVisualizer = () => {
 
             // Keep shapes white with additive blending - only visible on black background
             geom.material.blending = THREE.AdditiveBlending;
-            geom.material.color.setRGB(1, 1, 1);
+					
+						geom.material.color.setRGB(1, 1, 1);
           });
         }
       }
