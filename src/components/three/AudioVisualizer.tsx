@@ -35,26 +35,6 @@ const PARTICLE_COLOR: ParticleColorConfig = {
   },
 };
 
-// Bass configuration
-// const BASS_CONFIG = {
-//   subBassIntensity: 0.4,
-//   lowBassIntensity: 0.7,
-//   lowMidIntensity: 0.8,
-//   highMidIntensity: 0.9,
-//   highIntensity: 1,
-//   radiusMultiplier: 15,
-//   radiusPower: 22,
-//   particleScaleMax: 3,
-//   roundnessMultiplier: 25,
-//   lightIntensityMultiplier: 6,
-//   rotationSpeedMax: 33,
-//   enableColorShift: true,
-//   subBassShakeIntensity: 20,
-//   subBassRotationIntensity: 10,
-//   subBassThreshold: 0.2,
-//   subBassDecay: 0.05,
-//   subBassAttack: 5,
-// };
 // test lowbass
 const BASS_CONFIG: BassConfig = {
   subBassIntensity: 0.4,
@@ -63,10 +43,10 @@ const BASS_CONFIG: BassConfig = {
   highMidIntensity: 0.9,
   highIntensity: 1,
   radiusMultiplier: 17,
-  // radiusPower: 22,
-  radiusPower: 20,
-  particleScaleMax: 4,
-  roundnessMultiplier: 20,
+  radiusPower: 22,
+  // radiusPower: 12,
+  particleScaleMax: 3,
+  roundnessMultiplier: 22,
   lightIntensityMultiplier: 10,
   rotationSpeedMax: 44,
   enableColorShift: true,
@@ -74,7 +54,7 @@ const BASS_CONFIG: BassConfig = {
   subBassRotationIntensity: 25,
   subBassThreshold: 0.2,
   subBassDecay: 0.05,
-  subBassAttack: 6, // increases explosion of particles / other effects on bass hits
+  subBassAttack: 4.5, // increases explosion of particles / other effects on bass hits
   // subBassAttack: 5,
 };
 
