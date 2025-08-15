@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { antidote_tsuruda, asteroids_prolix, basscannon_lyny, bluelights_ramzoid, dash_lyny, fuckyou_yojas, geyron_eprom, hard_sophie, honey_medasin, humbled_mrcarmack, hush_borne, laundry_money_lyny, levels_loj, missingyou_atu, nobody_lyny, power_loj, section_lyny, takeback_lyny, thecircle_eprom, throw_lyny, twilight_ozi, weightless_wink, wrath_tsuruda, ybn_yojas } from "../../assets/mp3s";
-const aud = section_lyny; // Update this path as needed
+const aud = nobody_lyny; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -47,19 +47,20 @@ const BASS_CONFIG = {
   lowMidIntensity: 0.8,
   highMidIntensity: 0.9,
   highIntensity: 1,
-  radiusMultiplier: 15,
+  radiusMultiplier: 17,
   // radiusPower: 22,
-  radiusPower: 14,
+  radiusPower: 20,
   particleScaleMax: 4,
-  roundnessMultiplier: 25,
+  roundnessMultiplier: 20,
   lightIntensityMultiplier: 10,
-  rotationSpeedMax: 33,
+  rotationSpeedMax: 44,
   enableColorShift: true,
   subBassShakeIntensity: 10,
   subBassRotationIntensity: 25,
   subBassThreshold: 0.2,
   subBassDecay: 0.05,
-  subBassAttack: 5,
+  subBassAttack: 2,
+  // subBassAttack: 5,
 };
 
 // Chromatic Aberration Configuration
