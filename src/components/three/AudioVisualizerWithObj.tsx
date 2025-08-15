@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { antidote_tsuruda, asteroids_prolix, basscannon_lyny, bluelights_ramzoid, dash_lyny, fuckyou_yojas, geyron_eprom, hard_sophie, honey_medasin, humbled_mrcarmack, hush_borne, laundry_money_lyny, levels_loj, missingyou_atu, nobody_lyny, power_loj, section_lyny, takeback_lyny, thecircle_eprom, throw_lyny, twilight_ozi, weightless_wink, wrath_tsuruda, ybn_yojas } from "../../assets/mp3s";
-const aud =nobody_lyny; // Update this path as needed
+import { nobody_lyny } from "../../assets/mp3s";
+const aud = nobody_lyny; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
@@ -59,7 +59,7 @@ const BASS_CONFIG = {
   subBassRotationIntensity: 25,
   subBassThreshold: 0.2,
   subBassDecay: 0.05,
-  subBassAttack: 4, // increases explosion of particles / other effects on bass hits
+  subBassAttack: 6, // increases explosion of particles / other effects on bass hits
   // subBassAttack: 5,
 };
 
@@ -86,14 +86,14 @@ const SHOOTING_STAR_CONFIG = {
   highFreqThreshold: 0.6, // Threshold for triggering new shooting stars
   combinedThreshold: 0.6, // Combined threshold for activation
   maxActiveStars: 2000, // Maximum number of active shooting stars
-  starLength: 25, // Length of each shooting star trail
-  starWidth: 2, // Width of shooting star
-  starSpeed: 4000, // Speed of shooting star (units per second)
+  starLength: 20, // Length of each shooting star trail
+  starWidth: 1, // Width of shooting star
+  starSpeed: 5000, // Speed of shooting star (units per second)
   starLifetime: 0.2, // Lifetime of each star in seconds
   baseOpacity: 1, // Starting opacity of shooting star
   fadeRate: 0.3, // How quickly stars fade as they age
   headFormationThreshold: 0.9, // Head must be fully formed
-  spawnRate: 0.01, // Minimum time between spawns (seconds)
+  spawnRate: 0.001, // Minimum time between spawns (seconds)
   headCenterY: 350, // Y position of head center
   headRadius: 75, // Head radius for spawn positioning
 };
@@ -197,7 +197,10 @@ class CameraController {
     const deltaY = e.clientY - this.previousMouseY;
     this.azimuthalAngle -= deltaX * 0.01;
     this.polarAngle -= deltaY * 0.01;
-    this.polarAngle = Math.max(this.minPolarAngle, Math.min(this.maxPolarAngle, this.polarAngle));
+    this.polarAngle = Math.max(
+      this.minPolarAngle,
+      Math.min(this.maxPolarAngle, this.polarAngle),
+    );
     this.previousMouseX = e.clientX;
     this.previousMouseY = e.clientY;
   }
@@ -221,9 +224,11 @@ class CameraController {
 
     this.distance += (this.targetDistance - this.distance) * 0.05;
 
-    this.camera.position.x = this.distance * Math.sin(this.polarAngle) * Math.sin(this.azimuthalAngle);
+    this.camera.position.x =
+      this.distance * Math.sin(this.polarAngle) * Math.sin(this.azimuthalAngle);
     this.camera.position.y = this.distance * Math.cos(this.polarAngle);
-    this.camera.position.z = this.distance * Math.sin(this.polarAngle) * Math.cos(this.azimuthalAngle);
+    this.camera.position.z =
+      this.distance * Math.sin(this.polarAngle) * Math.cos(this.azimuthalAngle);
     this.camera.lookAt(0, 0, 0);
   }
 
