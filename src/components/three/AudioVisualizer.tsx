@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { alone_wink, areuthere_muramasa, asteroids_prolix, basscannon_lyny, carbon_thook, daydreams_gjones, flusterfuck_isqa, fuckyou_yojas, geyron_eprom, hard_sophie, holdmedown_borne, honey_medasin, leaving_wink, levels_loj, lost_stwo, nobody_lyny, power_loj, section_lyny, stephanie_danielallen, thecircle_eprom, throw_lyny, ybn_yojas } from "../../assets/mp3s";
+import { section_lyny } from "../../assets/mp3s";
 import type {
   ParticleColorConfig,
   BassConfig,
@@ -36,46 +36,45 @@ const PARTICLE_COLOR: ParticleColorConfig = {
   },
 };
 
-// Bass configuration
-// const BASS_CONFIG = {
-//   subBassIntensity: 0.4,
-//   lowBassIntensity: 0.7,
-//   lowMidIntensity: 0.8,
-//   highMidIntensity: 0.9,
-//   highIntensity: 1,
-//   radiusMultiplier: 15,
-//   radiusPower: 22,
-//   particleScaleMax: 3,
-//   roundnessMultiplier: 25,
-//   lightIntensityMultiplier: 6,
-//   rotationSpeedMax: 33,
-//   enableColorShift: true,
-//   subBassShakeIntensity: 20,
-//   subBassRotationIntensity: 10,
-//   subBassThreshold: 0.2,
-//   subBassDecay: 0.05,
-//   subBassAttack: 5,
-// };
-// Bass configuration (removed low bass, merged into sub-bass)
 const BASS_CONFIG: BassConfig = {
-  subBassIntensity: 0.45, // Increased since we're merging low bass into sub-bass
+  subBassIntensity: 0.37,
   lowMidIntensity: 0.8,
   highMidIntensity: 0.9,
   highIntensity: 1,
-  radiusMultiplier: 19,
-  // radiusMultiplier: 17,
-  radiusPower: 17,
-  particleScaleMax: 4,
-  roundnessMultiplier: 20,
-  lightIntensityMultiplier: 10,
-  rotationSpeedMax: 44,
+  radiusMultiplier: 15,
+  radiusPower: 8,
+  particleScaleMax: 3,
+  roundnessMultiplier: 22,
+  lightIntensityMultiplier: 6,
+  rotationSpeedMax: 40,
   enableColorShift: true,
   subBassShakeIntensity: 10,
-  subBassRotationIntensity: 25,
+  subBassRotationIntensity: 0,
   subBassThreshold: 0.2,
   subBassDecay: 0.05,
-  subBassAttack: 4, // increases explosion of particles / other effects on bass hits
+  subBassAttack: 5,
 };
+
+// Bass configuration (removed low bass, merged into sub-bass)
+// const BASS_CONFIG: BassConfig = {
+//   subBassIntensity: 0.45, // Increased since we're merging low bass into sub-bass
+//   lowMidIntensity: 0.8,
+//   highMidIntensity: 0.9,
+//   highIntensity: 1,
+//   radiusMultiplier: 19,
+//   // radiusMultiplier: 17,
+//   radiusPower: 17,
+//   particleScaleMax: 4,
+//   roundnessMultiplier: 20,
+//   lightIntensityMultiplier: 10,
+//   rotationSpeedMax: 44,
+//   enableColorShift: true,
+//   subBassShakeIntensity: 10,
+//   subBassRotationIntensity: 25,
+//   subBassThreshold: 0.2,
+//   subBassDecay: 0.05,
+//   subBassAttack: 4, // increases explosion of particles / other effects on bass hits
+// };
 
 // Chromatic Aberration Configuration
 const CHROMATIC_CONFIG: ChromaticConfig = {
@@ -385,15 +384,15 @@ const AudioVisualizer = () => {
 
   const pathLength = 256;
   // const particleCount = 77777;
-  const particleCount = 59595;
-  // const prefabDelay = 0.00015;
-  const prefabDelay = 0.00025;
-  const vertexDelay = 0.0125;
-	// vertex delay
-	// 0.0275 gives a more geometric vibe
-	// 0.0075 gives a more stringy vibe
+  const particleCount = 77777;
+  const prefabDelay = 0.00015;
+  // const prefabDelay = 0.00025;
+  const vertexDelay = 0.0075;
+  // vertex delay
+  // 0.0275 gives a more geometric vibe
+  // 0.0075 gives a more stringy vibe
 
-	// 0.0025 gives a separated stringy vibe
+  // 0.0025 gives a separated stringy vibe
 
   const minDuration = 40;
   const maxDuration = 600;
@@ -705,7 +704,7 @@ const AudioVisualizer = () => {
             { x: scale * 0.5, y: 0, z: scale * 0.5 },
             { x: -scale * 0.5, y: 0, z: scale * 0.5 },
             { x: -scale * 0.5, y: 0, z: -scale * 0.5 },
-            { x: scale * 0.5, y: 0, z: -scale * 0.5 }
+            { x: scale * 0.5, y: 0, z: -scale * 0.5 },
           ];
 
           // Apex vertices
@@ -727,18 +726,36 @@ const AudioVisualizer = () => {
             // Upper pyramid: base square + upper apex
             const basePoint = Math.floor(Math.random() * 4);
             const nextBase = (basePoint + 1) % 4;
-            
-            x = r1 * baseVertices[basePoint].x + r2 * baseVertices[nextBase].x + r3 * upperApex.x;
-            y = r1 * baseVertices[basePoint].y + r2 * baseVertices[nextBase].y + r3 * upperApex.y;
-            z = r1 * baseVertices[basePoint].z + r2 * baseVertices[nextBase].z + r3 * upperApex.z;
+
+            x =
+              r1 * baseVertices[basePoint].x +
+              r2 * baseVertices[nextBase].x +
+              r3 * upperApex.x;
+            y =
+              r1 * baseVertices[basePoint].y +
+              r2 * baseVertices[nextBase].y +
+              r3 * upperApex.y;
+            z =
+              r1 * baseVertices[basePoint].z +
+              r2 * baseVertices[nextBase].z +
+              r3 * upperApex.z;
           } else {
             // Lower pyramid: base square + lower apex
             const basePoint = Math.floor(Math.random() * 4);
             const nextBase = (basePoint + 1) % 4;
-            
-            x = r1 * baseVertices[basePoint].x + r2 * baseVertices[nextBase].x + r3 * lowerApex.x;
-            y = r1 * baseVertices[basePoint].y + r2 * baseVertices[nextBase].y + r3 * lowerApex.y;
-            z = r1 * baseVertices[basePoint].z + r2 * baseVertices[nextBase].z + r3 * lowerApex.z;
+
+            x =
+              r1 * baseVertices[basePoint].x +
+              r2 * baseVertices[nextBase].x +
+              r3 * lowerApex.x;
+            y =
+              r1 * baseVertices[basePoint].y +
+              r2 * baseVertices[nextBase].y +
+              r3 * lowerApex.y;
+            z =
+              r1 * baseVertices[basePoint].z +
+              r2 * baseVertices[nextBase].z +
+              r3 * lowerApex.z;
           }
         }
 
@@ -2234,7 +2251,7 @@ const AudioVisualizer = () => {
             const centerX = 0;
             const centerZ = 0;
             const baseY = 0; // Fixed height, no traveling up
-            
+
             // Vertical movement based on bass hits
             let verticalOffset = 0;
             if (isBassHit) {
@@ -2242,39 +2259,49 @@ const AudioVisualizer = () => {
             }
 
             // Smooth orbital motion
-            const orbitRadius = geom.orbitRadius * (1 + geom.frequencyResponse * 0.3);
+            const orbitRadius =
+              geom.orbitRadius * (1 + geom.frequencyResponse * 0.3);
             const x = centerX + Math.cos(geom.orbitAngle) * orbitRadius;
             const z = centerZ + Math.sin(geom.orbitAngle) * orbitRadius;
-            const y = baseY + verticalOffset + Math.sin(geom.orbitAngle * 0.5) * 50; // BOBBING + bass vertical
+            const y =
+              baseY + verticalOffset + Math.sin(geom.orbitAngle * 0.5) * 50; // BOBBING + bass vertical
 
             geom.mesh.position.set(x, y, z);
 
             // Update material opacity and size based on frequency
             const intensityMultiplier = 0.5 + geom.frequencyResponse * 1.5;
             geom.material.opacity = Math.min(1.0, intensityMultiplier);
-            
+
             // Enhanced particle size scaling like spline particles
             let particleScale = 1.0;
             if (geom.type === "sphere") {
               // Bass-reactive scaling for sphere
-              particleScale = 1.0 + subBassAvg * (BASS_CONFIG.particleScaleMax - 1.0) * 1.5;
+              particleScale =
+                1.0 + subBassAvg * (BASS_CONFIG.particleScaleMax - 1.0) * 1.5;
             } else if (geom.type === "cube") {
               // Mid-frequency scaling for cube
-              particleScale = 1.0 + lowMidAvg * (BASS_CONFIG.particleScaleMax - 1.0) * 1.2;
+              particleScale =
+                1.0 + lowMidAvg * (BASS_CONFIG.particleScaleMax - 1.0) * 1.2;
             } else if (geom.type === "pyramid") {
               // High-frequency scaling for pyramid
-              particleScale = 1.0 + highAvg * (BASS_CONFIG.particleScaleMax - 1.0) * 1.0;
+              particleScale =
+                1.0 + highAvg * (BASS_CONFIG.particleScaleMax - 1.0) * 1.0;
             }
-            
+
             // Apply particle size with bass hit boost (reduced by 40% + 30% smaller)
             const bassBoost = isBassHit ? 1.5 : 1.0;
-            geom.material.size = (3 + geom.frequencyResponse * 5) * particleScale * bassBoost * 0.6 * 0.7;
+            geom.material.size =
+              (3 + geom.frequencyResponse * 5) *
+              particleScale *
+              bassBoost *
+              0.6 *
+              0.7;
 
             // Keep shapes white with additive blending - only visible on black background
             geom.material.blending = THREE.AdditiveBlending;
-						if(anim.colorInversionTarget === 1) {
-							geom.material.opacity = 0;
-						}
+            if (anim.colorInversionTarget === 1) {
+              geom.material.opacity = 0;
+            }
             geom.material.color.setRGB(1, 1, 1);
           });
         }
@@ -2396,8 +2423,8 @@ const AudioVisualizer = () => {
 
             // Keep shapes white with additive blending - only visible on black background
             geom.material.blending = THREE.AdditiveBlending;
-					
-						geom.material.color.setRGB(1, 1, 1);
+
+            geom.material.color.setRGB(1, 1, 1);
           });
         }
       }
