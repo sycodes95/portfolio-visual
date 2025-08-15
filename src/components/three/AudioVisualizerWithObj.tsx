@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { antidote_tsuruda, asteroids_prolix, basscannon_lyny, bluelights_ramzoid, dash_lyny, fuckyou_yojas, geyron_eprom, hard_sophie, honey_medasin, humbled_mrcarmack, hush_borne, laundry_money_lyny, levels_loj, missingyou_atu, nobody_lyny, power_loj, section_lyny, takeback_lyny, thecircle_eprom, throw_lyny, twilight_ozi, weightless_wink, wrath_tsuruda, ybn_yojas } from "../../assets/mp3s";
-const aud = section_lyny; // Update this path as needed
+const aud =nobody_lyny; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR = {
