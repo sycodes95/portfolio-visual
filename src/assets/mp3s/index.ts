@@ -41,6 +41,10 @@ export { default as honey_medasin } from "./Kučka - Honey _medasin redo_ - meda
 export { default as nobody_lyny } from "./Nobody Else - LYNY - SoundLoadMate.com.mp3";
 export { default as section_lyny } from "./Section - LYNY - SoundLoadMate.com.mp3";
 export { default as basscannon_lyny } from "./Bass Cannon _LYNY Flip_ - LYNY - SoundLoadMate.com.mp3";
+export { default as dash_lyny } from "./Dash - LYNY - SoundLoadMate.com.mp3";
+export { default as takeback_lyny } from "./Take Back - LYNY - SoundLoadMate.com.mp3";
+export { default as laundry_money_lyny } from "./Jon Casey _ LYNY - Laundry Money - LYNY_ Jon Casey - SoundLoadMate.com.mp3";
+export { default as throw_lyny } from "./THROW - LYNY - SoundLoadMate.com.mp3";
 
 export const immortal_eprom =
   "https://audio.jukehost.co.uk/Yszr2ZqGhoNJNAGTEPFQGB5AtMXCSwjw";

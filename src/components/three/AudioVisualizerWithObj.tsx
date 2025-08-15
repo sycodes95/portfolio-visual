@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { antidote_tsuruda, asteroids_prolix, basscannon_lyny, bluelights_ramzoid, fuckyou_yojas, geyron_eprom, hard_sophie, honey_medasin, humbled_mrcarmack, hush_borne, levels_loj, missingyou_atu, nobody_lyny, power_loj, section_lyny, thecircle_eprom, twilight_ozi, weightless_wink, wrath_tsuruda, ybn_yojas } from "../../assets/mp3s";
+import { antidote_tsuruda, asteroids_prolix, basscannon_lyny, bluelights_ramzoid, dash_lyny, fuckyou_yojas, geyron_eprom, hard_sophie, honey_medasin, humbled_mrcarmack, hush_borne, laundry_money_lyny, levels_loj, missingyou_atu, nobody_lyny, power_loj, section_lyny, takeback_lyny, thecircle_eprom, throw_lyny, twilight_ozi, weightless_wink, wrath_tsuruda, ybn_yojas } from "../../assets/mp3s";
 const aud = section_lyny; // Update this path as needed
 
 // Particle color configuration
@@ -613,8 +613,8 @@ const AudioVisualizerWithObject = () => {
         console.log("OBJ loaded, creating particle system...");
 
         // Transform and scale vertices
-        const headScale = 20;
-        const headOffsetY = 600;
+        const headScale = 17;
+        const headOffsetY = 400;
         const headRotationX = -Math.PI / 2.5 + (-15 * Math.PI) / 180;
 
         // Sample points from the head surface
