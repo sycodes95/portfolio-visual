@@ -17,7 +17,7 @@ import type {
   CatmullRomFunction,
 } from "./AudioVisualizer.types";
 
-const aud = thecircle_eprom; // Update this path as needed
+const aud = section_lyny; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR: ParticleColorConfig = {
