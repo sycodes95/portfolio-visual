@@ -45,6 +45,13 @@ export { default as dash_lyny } from "./Dash - LYNY - SoundLoadMate.com.mp3";
 export { default as takeback_lyny } from "./Take Back - LYNY - SoundLoadMate.com.mp3";
 export { default as laundry_money_lyny } from "./Jon Casey _ LYNY - Laundry Money - LYNY_ Jon Casey - SoundLoadMate.com.mp3";
 export { default as throw_lyny } from "./THROW - LYNY - SoundLoadMate.com.mp3";
+export { default as lunch_phrva } from "./Billie Eilish - LUNCH _Phrva Flip_ - Phrva - SoundLoadMate.com.mp3";
+export { default as gasolina_onhell } from "./Daddy Yankee - Gasolina _ONHELL_s Chicano Jungle Remix_ - ONHELL - SoundLoadMate.com.mp3";
+export { default as dubstepforkids_onhell } from "./Dubstep For Kids - ONHELL - SoundLoadMate.com.mp3";
+export { default as grimeonsteroid_onhell } from "./Grime On Steroids - ONHELL_ Chef Boyarbeatz - SoundLoadMate.com.mp3";
+export { default as faneto_onhell } from "./Chief Keef - Faneto ONHELL Remix_ - ONHELL - SoundLoadMate.com.mp3";
+export { default as migi_tsuruda } from "./Tsuruda - Migi - Tsuruda - SoundLoadMate.com.mp3"
+export { default as muadeep_twofingers } from "./Two Fingers Vs. Muadeep_ Cronos - Two Fingers vs. Muadeep - SoundLoadMate.com.mp3"
 
 export const immortal_eprom =
   "https://audio.jukehost.co.uk/Yszr2ZqGhoNJNAGTEPFQGB5AtMXCSwjw";

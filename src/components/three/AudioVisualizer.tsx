@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { nobody_lyny } from "../../assets/mp3s";
+import { antidote_tsuruda, dubstepforkids_onhell, faneto_onhell, gasolina_onhell, grimeonsteroid_onhell, ivebeenthinking_borne, laundry_money_lyny, lunch_phrva, migi_tsuruda, muadeep_twofingers, nobody_lyny, section_lyny, takeback_lyny, thecorruption_eprom, thejudgment_eprom, throw_lyny } from "../../assets/mp3s";
 import type {
   ParticleColorConfig,
   BassConfig,
@@ -16,7 +16,7 @@ import type {
   CatmullRomFunction,
 } from "./AudioVisualizer.types";
 
-const aud = nobody_lyny; // Update this path as needed
+const aud = muadeep_twofingers; // Update this path as needed
 
 // Particle color configuration
 const PARTICLE_COLOR: ParticleColorConfig = {
@@ -38,20 +38,20 @@ const PARTICLE_COLOR: ParticleColorConfig = {
 // test lowbass
 const BASS_CONFIG: BassConfig = {
   subBassIntensity: 0.4,
-  lowBassIntensity: 0.7,
+  lowBassIntensity: 0.9,
   lowMidIntensity: 0.8,
   highMidIntensity: 0.9,
   highIntensity: 1,
   radiusMultiplier: 17,
   radiusPower: 22,
   // radiusPower: 12,
-  particleScaleMax: 3,
+  particleScaleMax: 3.5,
   roundnessMultiplier: 22,
   lightIntensityMultiplier: 10,
   rotationSpeedMax: 44,
   enableColorShift: true,
   subBassShakeIntensity: 10,
-  subBassRotationIntensity: 25,
+  subBassRotationIntensity: 69,
   subBassThreshold: 0.2,
   subBassDecay: 0.05,
   subBassAttack: 4.5, // increases explosion of particles / other effects on bass hits
